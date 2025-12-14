@@ -3,23 +3,15 @@
 namespace graphix {
     namespace vertex {
 
-        Graph::Graph() = default;
-
-        Graph::NodeId Graph::add_node() {
-            NodeId id = m_nodes.size();
-            m_nodes.push_back(id);
-            return id;
+        // Implementation for void specialization
+        typename Graph<void>::VertexId Graph<void>::add_vertex() {
+            auto id = m_vertices.add(0); // Dummy value
+            return id.value();
         }
 
-        Graph::EdgeId Graph::add_edge(NodeId a, NodeId b) {
-            EdgeId id = m_edges.size();
-            m_edges.emplace_back(a, b);
-            return id;
-        }
+        size_t Graph<void>::vertex_count() const { return m_vertices.size(); }
 
-        size_t Graph::node_count() const { return m_nodes.size(); }
-
-        size_t Graph::edge_count() const { return m_edges.size(); }
+        bool Graph<void>::has_vertex(VertexId v) const { return m_vertices.contains(Id<int>(v)); }
 
     } // namespace vertex
 } // namespace graphix

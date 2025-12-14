@@ -4,9 +4,8 @@
 #include <doctest/doctest.h>
 
 TEST_CASE("Vertex Graph exists") {
-    graphix::vertex::Graph vgraph;
-    CHECK(vgraph.node_count() == 0);
-    CHECK(vgraph.edge_count() == 0);
+    graphix::vertex::Graph<void> vgraph;
+    CHECK(vgraph.vertex_count() == 0);
 }
 
 TEST_CASE("Factor Graph exists") {
