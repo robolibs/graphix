@@ -2,12 +2,19 @@
 
 This project includes reference implementations and draws inspiration from the following open-source projects:
 
+### Boost.Graph
+- **Repository**: [https://github.com/boostorg/graph](https://github.com/boostorg/graph)
+- **Website**: [https://www.boost.org/doc/libs/release/libs/graph/](https://www.boost.org/doc/libs/release/libs/graph/)
+- **License**: Boost Software License 1.0
+- **Description**: A comprehensive C++ library providing generic graph data structures and algorithms
+- **Note**: Boost.Graph is a foundational library that inspired the graph data structure design and algorithmic implementations in this project
+
 ### GTSAM (Georgia Tech Smoothing and Mapping Library)
 - **Repository**: [https://github.com/borglab/gtsam](https://github.com/borglab/gtsam)
 - **License**: BSD 3-Clause License
 - **Copyright**: Copyright (c) 2010, Georgia Tech Research Corporation, Atlanta, Georgia 30332-0415
 - **Description**: A C++ library that implements smoothing and mapping (SAM) in robotics and vision, using Factor Graphs and Bayes Networks as the underlying computing paradigm
-- **Note**: GTSAM is the foundational library that inspired much of this project's design and implementation
+- **Note**: GTSAM is a foundational library that inspired the factor graph design and optimization implementation in this project
 
 ### Easy-Factor-Graph
 - **Repository**: [https://github.com/andreacasalino/Easy-Factor-Graph](https://github.com/andreacasalino/Easy-Factor-Graph)
@@ -32,4 +39,4 @@ This project includes reference implementations and draws inspiration from the f
 - **Note**: For commercial uses, please contact the authors
 
 ---
-We gratefully acknowledge these projects and their contributors for their valuable work, which has served as reference and inspiration for the development of Graphix. Special thanks to the GTSAM team at Georgia Tech for creating such a foundational library in the robotics and computer vision community.
+We gratefully acknowledge these projects and their contributors for their valuable work, which has served as reference and inspiration for the development of Graphix. Special thanks to the Boost.Graph library for providing foundational graph algorithms and data structures, and to the GTSAM team at Georgia Tech for creating such a foundational library in the robotics and computer vision community.
