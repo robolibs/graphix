@@ -1,0 +1,106 @@
+#pragma once
+
+#include "graphix/factor/graph.hpp"
+#include "graphix/factor/nonlinear/nonlinear_factor.hpp"
+#include "graphix/factor/values.hpp"
+#include <unordered_map>
+
+namespace graphix::factor {
+
+    /**
+     * @brief Simple gradient descent optimizer using finite differences
+     *
+     * Optimizes a factor graph by minimizing total error using gradient descent.
+     * Gradients are computed using central finite differences.
+     */
+    class GradientDescentOptimizer {
+      public:
+        /**
+         * @brief Configuration parameters for gradient descent
+         */
+        struct Parameters {
+            int max_iterations = 100; ///< Maximum number of iterations
+            double step_size = 0.01;  ///< Fixed step size for gradient descent
+            double tolerance = 1e-6;  ///< Convergence tolerance on gradient norm
+            double h = 1e-5;          ///< Step size for finite differences
+            bool verbose = false;     ///< Print iteration info
+
+            Parameters() = default;
+        };
+
+        /**
+         * @brief Result of optimization
+         */
+        struct Result {
+            Values values;        ///< Optimized values
+            double final_error;   ///< Final total error
+            int iterations;       ///< Number of iterations performed
+            bool converged;       ///< Whether convergence was achieved
+            double gradient_norm; ///< Final gradient norm
+
+            Result(const Values &v, double err, int iter, bool conv, double gnorm)
+                : values(v), final_error(err), iterations(iter), converged(conv), gradient_norm(gnorm) {}
+        };
+
+        /**
+         * @brief Construct optimizer with default parameters
+         */
+        GradientDescentOptimizer() = default;
+
+        /**
+         * @brief Construct optimizer with custom parameters
+         */
+        explicit GradientDescentOptimizer(const Parameters &params);
+
+        /**
+         * @brief Optimize a factor graph starting from initial values
+         *
+         * @param graph Factor graph to optimize
+         * @param initial Initial variable values
+         * @return Optimization result with final values and diagnostics
+         */
+        Result optimize(const Graph<NonlinearFactor> &graph, const Values &initial) const;
+
+        /**
+         * @brief Get current parameters
+         */
+        const Parameters &parameters() const { return params_; }
+
+        /**
+         * @brief Set parameters
+         */
+        void set_parameters(const Parameters &params) { params_ = params; }
+
+      private:
+        Parameters params_;
+
+        /**
+         * @brief Compute total error of graph given values
+         */
+        double compute_error(const Graph<NonlinearFactor> &graph, const Values &values) const;
+
+        /**
+         * @brief Compute gradient for all variables using finite differences
+         *
+         * Uses central differences: df/dx ≈ (f(x+h) - f(x-h)) / (2h)
+         *
+         * @return Map from Key to gradient value
+         */
+        std::unordered_map<Key, double> compute_gradient(const Graph<NonlinearFactor> &graph,
+                                                         const Values &values) const;
+
+        /**
+         * @brief Compute L2 norm of gradient
+         */
+        double gradient_norm(const std::unordered_map<Key, double> &gradient) const;
+
+        /**
+         * @brief Update values by taking a gradient descent step
+         *
+         * x_new = x_old - step_size * gradient
+         */
+        Values update_values(const Values &current, const std::unordered_map<Key, double> &gradient,
+                             double step_size) const;
+    };
+
+} // namespace graphix::factor
