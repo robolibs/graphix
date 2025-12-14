@@ -150,6 +150,30 @@ namespace graphix {
             return found_tgt;
         }
 
+        EdgeType Graph<void>::get_edge_type(graphix::vertex::EdgeId e) const {
+            // Search through all adjacency lists to find edge with this ID
+            for (const auto &[vertex, edges] : m_adjacency) {
+                for (const auto &edge : edges) {
+                    if (edge.id == e) {
+                        return edge.type;
+                    }
+                }
+            }
+            throw std::invalid_argument("Edge ID not found");
+        }
+
+        std::vector<graphix::vertex::EdgeId> Graph<void>::out_edges(VertexId v) const {
+            std::vector<graphix::vertex::EdgeId> result;
+            auto it = m_adjacency.find(v);
+            if (it != m_adjacency.end()) {
+                result.reserve(it->second.size());
+                for (const auto &edge : it->second) {
+                    result.push_back(edge.id);
+                }
+            }
+            return result;
+        }
+
         // Adjacency and neighbor queries for void specialization
         std::vector<Graph<void>::VertexId> Graph<void>::neighbors(VertexId v) const {
             std::vector<VertexId> result;

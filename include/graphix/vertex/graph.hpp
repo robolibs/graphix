@@ -66,6 +66,8 @@ namespace graphix {
             std::pair<EdgeId, bool> edge(VertexId u, VertexId v) const;
             VertexId source(EdgeId e) const;
             VertexId target(EdgeId e) const;
+            EdgeType get_edge_type(EdgeId e) const;
+            std::vector<EdgeId> out_edges(VertexId v) const;
 
             // Adjacency and neighbor queries
             std::vector<VertexId> neighbors(VertexId v) const;
@@ -130,6 +132,8 @@ namespace graphix {
             std::pair<EdgeId, bool> edge(VertexId u, VertexId v) const;
             VertexId source(EdgeId e) const;
             VertexId target(EdgeId e) const;
+            EdgeType get_edge_type(EdgeId e) const;
+            std::vector<EdgeId> out_edges(VertexId v) const;
 
             // Adjacency and neighbor queries
             std::vector<VertexId> neighbors(VertexId v) const;
@@ -327,6 +331,30 @@ namespace graphix {
                 throw std::invalid_argument("Edge ID not found");
             }
             return found_tgt;
+        }
+
+        template <typename VertexProperty> EdgeType Graph<VertexProperty>::get_edge_type(EdgeId e) const {
+            // Search through all adjacency lists to find edge with this ID
+            for (const auto &[vertex, edges] : m_adjacency) {
+                for (const auto &edge : edges) {
+                    if (edge.id == e) {
+                        return edge.type;
+                    }
+                }
+            }
+            throw std::invalid_argument("Edge ID not found");
+        }
+
+        template <typename VertexProperty> std::vector<EdgeId> Graph<VertexProperty>::out_edges(VertexId v) const {
+            std::vector<EdgeId> result;
+            auto it = m_adjacency.find(v);
+            if (it != m_adjacency.end()) {
+                result.reserve(it->second.size());
+                for (const auto &edge : it->second) {
+                    result.push_back(edge.id);
+                }
+            }
+            return result;
         }
 
         // Adjacency and neighbor queries
