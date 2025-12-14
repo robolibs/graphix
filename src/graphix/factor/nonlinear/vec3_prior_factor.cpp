@@ -18,14 +18,19 @@ namespace graphix::factor {
         // Compute difference
         Vec3d diff = x - prior_;
 
-        // Compute weighted squared error: 0.5 * sum((diff[i] / sigma[i])^2)
-        double error = 0.0;
+        // Compute weighted squared error: sum((diff[i] / sigma[i])^2)
+        double squared_error = 0.0;
         for (int i = 0; i < 3; i++) {
             double weighted = diff[i] / sigmas_[i];
-            error += weighted * weighted;
+            squared_error += weighted * weighted;
         }
 
-        return 0.5 * error;
+        // Apply robust loss function if present
+        if (loss_function_) {
+            return loss_function_->evaluate(squared_error);
+        }
+
+        return 0.5 * squared_error;
     }
 
     std::vector<double> Vec3PriorFactor::error_vector(const Values &values) const {
