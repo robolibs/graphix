@@ -8,23 +8,14 @@
 namespace graphix {
     namespace factor {
 
-        // ============================================================================
-        // Value: Abstract base class for type-erased values
-        // ============================================================================
-
+        // Abstract base class for type-erased values
         class Value {
           public:
             virtual ~Value() = default;
-
-            // Deep copy for cloning Values container
             virtual Value *clone() const = 0;
         };
 
-        // ============================================================================
-        // GenericValue<T>: Templated wrapper for actual value storage
-        // Step 1a: Initially just support double
-        // ============================================================================
-
+        // Template wrapper for actual value storage
         template <typename T> class GenericValue : public Value {
           public:
             explicit GenericValue(const T &value) : m_value(value) {}
@@ -38,46 +29,46 @@ namespace graphix {
             T m_value;
         };
 
-        // ============================================================================
-        // Values: Type-erased container for variables
-        // Step 1a: Support insert/at for double only
-        // ============================================================================
-
+        // Type-erased container for variables
         class Values {
           public:
             Values() = default;
 
-            // Copy constructor - deep copy all values
             Values(const Values &other);
-
-            // Assignment operator
             Values &operator=(const Values &other);
 
-            // Move constructor and assignment
             Values(Values &&) = default;
             Values &operator=(Values &&) = default;
 
             ~Values() = default;
 
-            // Insert a new value (currently double only for Step 1a)
-            void insert(Key key, double value);
+            // Insert a value of any type
+            template <typename T> void insert(Key key, const T &value) {
+                if (exists(key)) {
+                    throw std::runtime_error("Key already exists in Values");
+                }
+                m_values[key] = std::make_unique<GenericValue<T>>(value);
+            }
 
-            // Retrieve a value (currently double only for Step 1a)
-            double at(Key key) const;
+            // Retrieve a value with type checking
+            template <typename T> const T &at(Key key) const {
+                auto it = m_values.find(key);
+                if (it == m_values.end()) {
+                    throw std::out_of_range("Key not found in Values");
+                }
 
-            // Check if key exists
+                auto *generic_value = dynamic_cast<GenericValue<T> *>(it->second.get());
+                if (!generic_value) {
+                    throw std::runtime_error("Type mismatch: requested type does not match stored type");
+                }
+
+                return generic_value->value();
+            }
+
             bool exists(Key key) const;
-
-            // Get number of values
             size_t size() const;
-
-            // Check if empty
             bool empty() const;
-
-            // Erase a value by key
             void erase(Key key);
-
-            // Clear all values
             void clear();
 
           private:
