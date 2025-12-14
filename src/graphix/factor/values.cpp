@@ -26,8 +26,16 @@ namespace graphix {
         bool Values::empty() const { return m_values.empty(); }
 
         void Values::erase(Key key) { m_values.erase(key); }
-
         void Values::clear() { m_values.clear(); }
+
+        std::vector<Key> Values::keys() const {
+            std::vector<Key> result;
+            result.reserve(m_values.size());
+            for (const auto &[key, _] : m_values) {
+                result.push_back(key);
+            }
+            return result;
+        }
 
     } // namespace factor
 } // namespace graphix

@@ -278,3 +278,82 @@ TEST_CASE("Values - erase works with any type") {
     CHECK_FALSE(values.exists(2));
     CHECK(values.exists(3));
 }
+
+// ============================================================================
+// Iteration tests
+// ============================================================================
+
+TEST_CASE("Values - keys() returns all keys") {
+    Values values;
+
+    values.insert<double>(1, 1.0);
+    values.insert<double>(5, 5.0);
+    values.insert<double>(3, 3.0);
+
+    auto keys = values.keys();
+
+    CHECK(keys.size() == 3);
+
+    // Keys should be sorted (std::map is ordered)
+    CHECK(keys[0] == 1);
+    CHECK(keys[1] == 3);
+    CHECK(keys[2] == 5);
+}
+
+TEST_CASE("Values - keys() on empty container") {
+    Values values;
+
+    auto keys = values.keys();
+
+    CHECK(keys.empty());
+    CHECK(keys.size() == 0);
+}
+
+TEST_CASE("Values - range-based for loop over keys") {
+    Values values;
+
+    values.insert<int>(10, 100);
+    values.insert<int>(20, 200);
+    values.insert<int>(30, 300);
+
+    std::vector<Key> collected_keys;
+    for (const auto &[key, value] : values) {
+        collected_keys.push_back(key);
+    }
+
+    CHECK(collected_keys.size() == 3);
+    CHECK(collected_keys[0] == 10);
+    CHECK(collected_keys[1] == 20);
+    CHECK(collected_keys[2] == 30);
+}
+
+TEST_CASE("Values - iterate and access values") {
+    Values values;
+
+    values.insert<double>(1, 10.5);
+    values.insert<double>(2, 20.5);
+    values.insert<double>(3, 30.5);
+
+    double sum = 0.0;
+    for (const auto &[key, value] : values) {
+        sum += values.at<double>(key);
+    }
+
+    CHECK(sum == 61.5);
+}
+
+TEST_CASE("Values - iterate with mixed types") {
+    Values values;
+
+    values.insert<int>(1, 100);
+    values.insert<double>(2, 2.5);
+    values.insert<std::string>(3, "test");
+
+    size_t count = 0;
+    for (const auto &[key, value] : values) {
+        count++;
+        CHECK(values.exists(key));
+    }
+
+    CHECK(count == 3);
+}

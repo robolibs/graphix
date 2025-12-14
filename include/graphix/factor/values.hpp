@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <stdexcept>
+#include <vector>
 
 namespace graphix {
     namespace factor {
@@ -70,6 +71,15 @@ namespace graphix {
             bool empty() const;
             void erase(Key key);
             void clear();
+
+            // Get all keys
+            std::vector<Key> keys() const;
+
+            // Iterator support for range-based loops
+            using const_iterator = std::map<Key, std::unique_ptr<Value>>::const_iterator;
+
+            const_iterator begin() const { return m_values.begin(); }
+            const_iterator end() const { return m_values.end(); }
 
           private:
             std::map<Key, std::unique_ptr<Value>> m_values;
