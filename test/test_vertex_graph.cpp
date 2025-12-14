@@ -857,3 +857,258 @@ TEST_CASE("Clear graph with properties") {
     CHECK(g.vertex_count() == 0);
     CHECK(g.edge_count() == 0);
 }
+
+// ============================================================================
+// Step 7: Boost-style Free Functions
+// ============================================================================
+
+TEST_CASE("Boost-style num_vertices") {
+    graphix::vertex::Graph<void> g;
+
+    CHECK(graphix::vertex::num_vertices(g) == 0);
+
+    g.add_vertex();
+    g.add_vertex();
+    g.add_vertex();
+
+    CHECK(graphix::vertex::num_vertices(g) == 3);
+}
+
+TEST_CASE("Boost-style num_vertices with properties") {
+    graphix::vertex::Graph<int> g;
+
+    CHECK(graphix::vertex::num_vertices(g) == 0);
+
+    g.add_vertex(10);
+    g.add_vertex(20);
+
+    CHECK(graphix::vertex::num_vertices(g) == 2);
+}
+
+TEST_CASE("Boost-style num_edges") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    CHECK(graphix::vertex::num_edges(g) == 0);
+
+    g.add_edge(v1, v2);
+    CHECK(graphix::vertex::num_edges(g) == 1);
+
+    g.add_edge(v2, v3);
+    CHECK(graphix::vertex::num_edges(g) == 2);
+}
+
+TEST_CASE("Boost-style add_vertex without properties") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = graphix::vertex::add_vertex(g);
+    auto v2 = graphix::vertex::add_vertex(g);
+
+    CHECK(graphix::vertex::num_vertices(g) == 2);
+    CHECK(g.has_vertex(v1));
+    CHECK(g.has_vertex(v2));
+}
+
+TEST_CASE("Boost-style add_vertex with properties") {
+    graphix::vertex::Graph<int> g;
+
+    auto v1 = graphix::vertex::add_vertex(100, g);
+    auto v2 = graphix::vertex::add_vertex(200, g);
+
+    CHECK(graphix::vertex::num_vertices(g) == 2);
+    CHECK(g[v1] == 100);
+    CHECK(g[v2] == 200);
+}
+
+TEST_CASE("Boost-style add_edge with weight") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = graphix::vertex::add_vertex(g);
+    auto v2 = graphix::vertex::add_vertex(g);
+
+    auto e = graphix::vertex::add_edge(v1, v2, 5.0, g);
+
+    CHECK(graphix::vertex::num_edges(g) == 1);
+    CHECK(g.has_edge(v1, v2));
+    CHECK(g.get_weight(e) == 5.0);
+}
+
+TEST_CASE("Boost-style add_edge without weight") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = graphix::vertex::add_vertex(g);
+    auto v2 = graphix::vertex::add_vertex(g);
+
+    auto e = graphix::vertex::add_edge(v1, v2, g);
+
+    CHECK(graphix::vertex::num_edges(g) == 1);
+    CHECK(g.get_weight(e) == 1.0); // Default weight
+}
+
+TEST_CASE("Boost-style degree") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = graphix::vertex::add_vertex(g);
+    auto v2 = graphix::vertex::add_vertex(g);
+    auto v3 = graphix::vertex::add_vertex(g);
+
+    CHECK(graphix::vertex::degree(v1, g) == 0);
+
+    graphix::vertex::add_edge(v1, v2, g);
+    CHECK(graphix::vertex::degree(v1, g) == 1);
+
+    graphix::vertex::add_edge(v1, v3, g);
+    CHECK(graphix::vertex::degree(v1, g) == 2);
+}
+
+TEST_CASE("Boost-style neighbors") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = graphix::vertex::add_vertex(g);
+    auto v2 = graphix::vertex::add_vertex(g);
+    auto v3 = graphix::vertex::add_vertex(g);
+
+    graphix::vertex::add_edge(v1, v2, g);
+    graphix::vertex::add_edge(v1, v3, g);
+
+    auto n = graphix::vertex::neighbors(v1, g);
+    CHECK(n.size() == 2);
+    CHECK(std::find(n.begin(), n.end(), v2) != n.end());
+    CHECK(std::find(n.begin(), n.end(), v3) != n.end());
+}
+
+TEST_CASE("Boost-style vertices") {
+    graphix::vertex::Graph<int> g;
+
+    auto v1 = graphix::vertex::add_vertex(100, g);
+    auto v2 = graphix::vertex::add_vertex(200, g);
+    auto v3 = graphix::vertex::add_vertex(300, g);
+
+    auto verts = graphix::vertex::vertices(g);
+    CHECK(verts.size() == 3);
+    CHECK(std::find(verts.begin(), verts.end(), v1) != verts.end());
+    CHECK(std::find(verts.begin(), verts.end(), v2) != verts.end());
+    CHECK(std::find(verts.begin(), verts.end(), v3) != verts.end());
+}
+
+TEST_CASE("Boost-style edges") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = graphix::vertex::add_vertex(g);
+    auto v2 = graphix::vertex::add_vertex(g);
+    auto v3 = graphix::vertex::add_vertex(g);
+
+    auto e1 = graphix::vertex::add_edge(v1, v2, 1.5, g);
+    auto e2 = graphix::vertex::add_edge(v2, v3, 2.5, g);
+
+    auto edge_list = graphix::vertex::edges(g);
+    CHECK(edge_list.size() == 2);
+
+    bool found_e1 = false, found_e2 = false;
+    for (const auto &edge : edge_list) {
+        if (edge.id == e1) {
+            CHECK(edge.weight == 1.5);
+            found_e1 = true;
+        } else if (edge.id == e2) {
+            CHECK(edge.weight == 2.5);
+            found_e2 = true;
+        }
+    }
+    CHECK(found_e1);
+    CHECK(found_e2);
+}
+
+TEST_CASE("Boost-style clear_graph") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = graphix::vertex::add_vertex(g);
+    auto v2 = graphix::vertex::add_vertex(g);
+    graphix::vertex::add_edge(v1, v2, g);
+
+    CHECK(graphix::vertex::num_vertices(g) == 2);
+    CHECK(graphix::vertex::num_edges(g) == 1);
+
+    graphix::vertex::clear_graph(g);
+
+    CHECK(graphix::vertex::num_vertices(g) == 0);
+    CHECK(graphix::vertex::num_edges(g) == 0);
+}
+
+TEST_CASE("Boost-style remove_vertex") {
+    graphix::vertex::Graph<int> g;
+
+    auto v1 = graphix::vertex::add_vertex(10, g);
+    auto v2 = graphix::vertex::add_vertex(20, g);
+    auto v3 = graphix::vertex::add_vertex(30, g);
+
+    graphix::vertex::add_edge(v1, v2, g);
+    graphix::vertex::add_edge(v2, v3, g);
+
+    CHECK(graphix::vertex::num_vertices(g) == 3);
+
+    graphix::vertex::remove_vertex(v2, g);
+
+    CHECK(graphix::vertex::num_vertices(g) == 2);
+    CHECK_FALSE(g.has_vertex(v2));
+    CHECK(g.has_vertex(v1));
+    CHECK(g.has_vertex(v3));
+}
+
+TEST_CASE("Boost-style remove_edge by ID") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = graphix::vertex::add_vertex(g);
+    auto v2 = graphix::vertex::add_vertex(g);
+    auto v3 = graphix::vertex::add_vertex(g);
+
+    auto e1 = graphix::vertex::add_edge(v1, v2, g);
+    auto e2 = graphix::vertex::add_edge(v2, v3, g);
+
+    CHECK(graphix::vertex::num_edges(g) == 2);
+
+    graphix::vertex::remove_edge(e1, g);
+
+    CHECK(graphix::vertex::num_edges(g) == 1);
+    CHECK_FALSE(g.has_edge(v1, v2));
+    CHECK(g.has_edge(v2, v3));
+}
+
+TEST_CASE("Boost-style remove_edge by vertices") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = graphix::vertex::add_vertex(g);
+    auto v2 = graphix::vertex::add_vertex(g);
+    auto v3 = graphix::vertex::add_vertex(g);
+
+    graphix::vertex::add_edge(v1, v2, g);
+    graphix::vertex::add_edge(v2, v3, g);
+
+    CHECK(graphix::vertex::num_edges(g) == 2);
+
+    graphix::vertex::remove_edge(v1, v2, g);
+
+    CHECK(graphix::vertex::num_edges(g) == 1);
+    CHECK_FALSE(g.has_edge(v1, v2));
+    CHECK(g.has_edge(v2, v3));
+}
+
+TEST_CASE("Boost-style mixed usage") {
+    // Test mixing member functions and free functions
+    graphix::vertex::Graph<int> g;
+
+    auto v1 = graphix::vertex::add_vertex(100, g); // Free function
+    auto v2 = g.add_vertex(200);                   // Member function
+    auto v3 = graphix::vertex::add_vertex(300, g); // Free function
+
+    auto e1 = g.add_edge(v1, v2);                   // Member function
+    auto e2 = graphix::vertex::add_edge(v2, v3, g); // Free function
+
+    CHECK(graphix::vertex::num_vertices(g) == 3); // Free function
+    CHECK(g.edge_count() == 2);                   // Member function
+
+    CHECK(graphix::vertex::degree(v2, g) == 2); // Free function
+    CHECK(g.degree(v1) == 1);                   // Member function
+}

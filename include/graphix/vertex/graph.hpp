@@ -328,5 +328,118 @@ namespace graphix {
             m_vertices.remove(Id<VertexProperty>(v));
         }
 
+        // ============================================================================
+        // Boost-style Free Functions for Compatibility
+        // ============================================================================
+
+        // Vertex count
+        template <typename VertexProperty> inline size_t num_vertices(const Graph<VertexProperty> &g) {
+            return g.vertex_count();
+        }
+
+        inline size_t num_vertices(const Graph<void> &g) { return g.vertex_count(); }
+
+        // Edge count
+        template <typename VertexProperty> inline size_t num_edges(const Graph<VertexProperty> &g) {
+            return g.edge_count();
+        }
+
+        inline size_t num_edges(const Graph<void> &g) { return g.edge_count(); }
+
+        // Add vertex
+        template <typename VertexProperty>
+        inline typename Graph<VertexProperty>::VertexId add_vertex(const VertexProperty &prop,
+                                                                   Graph<VertexProperty> &g) {
+            return g.add_vertex(prop);
+        }
+
+        inline Graph<void>::VertexId add_vertex(Graph<void> &g) { return g.add_vertex(); }
+
+        // Add edge
+        template <typename VertexProperty>
+        inline EdgeId add_edge(typename Graph<VertexProperty>::VertexId u, typename Graph<VertexProperty>::VertexId v,
+                               double weight, Graph<VertexProperty> &g) {
+            return g.add_edge(u, v, weight);
+        }
+
+        inline EdgeId add_edge(Graph<void>::VertexId u, Graph<void>::VertexId v, double weight, Graph<void> &g) {
+            return g.add_edge(u, v, weight);
+        }
+
+        template <typename VertexProperty>
+        inline EdgeId add_edge(typename Graph<VertexProperty>::VertexId u, typename Graph<VertexProperty>::VertexId v,
+                               Graph<VertexProperty> &g) {
+            return g.add_edge(u, v);
+        }
+
+        inline EdgeId add_edge(Graph<void>::VertexId u, Graph<void>::VertexId v, Graph<void> &g) {
+            return g.add_edge(u, v);
+        }
+
+        // Vertex degree
+        template <typename VertexProperty>
+        inline size_t degree(typename Graph<VertexProperty>::VertexId v, const Graph<VertexProperty> &g) {
+            return g.degree(v);
+        }
+
+        inline size_t degree(Graph<void>::VertexId v, const Graph<void> &g) { return g.degree(v); }
+
+        // Get neighbors
+        template <typename VertexProperty>
+        inline std::vector<typename Graph<VertexProperty>::VertexId>
+        neighbors(typename Graph<VertexProperty>::VertexId v, const Graph<VertexProperty> &g) {
+            return g.neighbors(v);
+        }
+
+        inline std::vector<Graph<void>::VertexId> neighbors(Graph<void>::VertexId v, const Graph<void> &g) {
+            return g.neighbors(v);
+        }
+
+        // Get all vertices
+        template <typename VertexProperty>
+        inline std::vector<typename Graph<VertexProperty>::VertexId> vertices(const Graph<VertexProperty> &g) {
+            return g.vertices();
+        }
+
+        inline std::vector<Graph<void>::VertexId> vertices(const Graph<void> &g) { return g.vertices(); }
+
+        // Get all edges
+        template <typename VertexProperty> inline std::vector<EdgeDescriptor> edges(const Graph<VertexProperty> &g) {
+            return g.edges();
+        }
+
+        inline std::vector<EdgeDescriptor> edges(const Graph<void> &g) { return g.edges(); }
+
+        // Clear graph
+        template <typename VertexProperty> inline void clear_graph(Graph<VertexProperty> &g) { g.clear(); }
+
+        inline void clear_graph(Graph<void> &g) { g.clear(); }
+
+        // Remove vertex
+        template <typename VertexProperty>
+        inline void remove_vertex(typename Graph<VertexProperty>::VertexId v, Graph<VertexProperty> &g) {
+            g.remove_vertex(v);
+        }
+
+        inline void remove_vertex(Graph<void>::VertexId v, Graph<void> &g) { g.remove_vertex(v); }
+
+        // Remove edge by ID
+        template <typename VertexProperty> inline void remove_edge(EdgeId e, Graph<VertexProperty> &g) {
+            g.remove_edge(e);
+        }
+
+        inline void remove_edge(EdgeId e, Graph<void> &g) { g.remove_edge(e); }
+
+        // Remove edge by vertices
+        template <typename VertexProperty>
+        inline void remove_edge(typename Graph<VertexProperty>::VertexId u, typename Graph<VertexProperty>::VertexId v,
+                                Graph<VertexProperty> &g) {
+            g.remove_edge(u, v);
+        }
+
+        inline void remove_edge(Graph<void>::VertexId u, Graph<void>::VertexId v, Graph<void> &g) {
+            g.remove_edge(u, v);
+        }
+
     } // namespace vertex
 } // namespace graphix
