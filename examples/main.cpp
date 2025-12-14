@@ -1,12 +1,14 @@
-#include "graphix/simple.hpp"
+#include "graphix/factor/graph.hpp"
+#include "graphix/vertice/graph.hpp"
 #include <iostream>
 
 int main() {
-    std::cout << "Graphix - A modern C++ graph library" << std::endl;
-    std::cout << "=====================================" << std::endl;
+    graphix::vertice::Graph vertice_graph;
+    graphix::factor::Graph factor_graph;
 
-    graphix::Simple simple;
-    simple.greet();
+    std::cout << "Graphix base structure is here!" << std::endl;
+    std::cout << "  - graphix::vertice::Graph" << std::endl;
+    std::cout << "  - graphix::factor::Graph" << std::endl;
 
     return 0;
 }
