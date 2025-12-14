@@ -2,6 +2,8 @@
 
 #include "graphix/kernel.hpp"
 #include "graphix/store.hpp"
+#include <limits>
+#include <optional>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>

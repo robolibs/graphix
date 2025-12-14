@@ -1,3 +1,4 @@
+#include "graphix/vertex/algorithms/dijkstra.hpp"
 #include "graphix/vertex/graph.hpp"
 #include <doctest/doctest.h>
 
@@ -546,4 +547,193 @@ TEST_CASE("Vertices iteration with Point properties") {
         CHECK(g[v].x > 0.0);
         CHECK(g[v].y > 0.0);
     }
+}
+
+// ============================================================================
+// Step 5: Dijkstra's Shortest Path
+// ============================================================================
+
+TEST_CASE("Simple shortest path") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    g.add_edge(v1, v2, 1.0);
+    g.add_edge(v2, v3, 2.0);
+
+    auto result = graphix::vertex::algorithms::dijkstra(g, v1, v3);
+
+    CHECK(result.found);
+    CHECK(result.distance == 3.0);
+    REQUIRE(result.path.size() == 3);
+    CHECK(result.path[0] == v1);
+    CHECK(result.path[1] == v2);
+    CHECK(result.path[2] == v3);
+}
+
+TEST_CASE("Shortest path same vertex") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+
+    auto result = graphix::vertex::algorithms::dijkstra(g, v1, v1);
+
+    CHECK(result.found);
+    CHECK(result.distance == 0.0);
+    REQUIRE(result.path.size() == 1);
+    CHECK(result.path[0] == v1);
+}
+
+TEST_CASE("Shortest path no path exists") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+    auto v4 = g.add_vertex();
+
+    // v1-v2 connected, v3-v4 connected, but no path between groups
+    g.add_edge(v1, v2, 1.0);
+    g.add_edge(v3, v4, 1.0);
+
+    auto result = graphix::vertex::algorithms::dijkstra(g, v1, v3);
+
+    CHECK_FALSE(result.found);
+    CHECK(result.distance == std::numeric_limits<double>::infinity());
+}
+
+TEST_CASE("Shortest path chooses minimum weight") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+    auto v4 = g.add_vertex();
+
+    // Create two paths from v1 to v4:
+    // v1 -> v2 -> v4 (cost 1 + 1 = 2)
+    // v1 -> v3 -> v4 (cost 5 + 5 = 10)
+    g.add_edge(v1, v2, 1.0);
+    g.add_edge(v2, v4, 1.0);
+    g.add_edge(v1, v3, 5.0);
+    g.add_edge(v3, v4, 5.0);
+
+    auto result = graphix::vertex::algorithms::dijkstra(g, v1, v4);
+
+    CHECK(result.found);
+    CHECK(result.distance == 2.0);
+    REQUIRE(result.path.size() == 3);
+    CHECK(result.path[0] == v1);
+    CHECK(result.path[1] == v2);
+    CHECK(result.path[2] == v4);
+}
+
+TEST_CASE("Shortest path with vertex properties") {
+    graphix::vertex::Graph<int> g;
+
+    auto v1 = g.add_vertex(100);
+    auto v2 = g.add_vertex(200);
+    auto v3 = g.add_vertex(300);
+
+    g.add_edge(v1, v2, 1.5);
+    g.add_edge(v2, v3, 2.5);
+
+    auto result = graphix::vertex::algorithms::dijkstra(g, v1, v3);
+
+    CHECK(result.found);
+    CHECK(result.distance == 4.0);
+    REQUIRE(result.path.size() == 3);
+
+    // Verify we can access properties along path
+    CHECK(g[result.path[0]] == 100);
+    CHECK(g[result.path[1]] == 200);
+    CHECK(g[result.path[2]] == 300);
+}
+
+TEST_CASE("Shortest path in complete graph") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+    auto v4 = g.add_vertex();
+
+    // Complete graph with all vertices connected
+    g.add_edge(v1, v2, 1.0);
+    g.add_edge(v1, v3, 3.0);
+    g.add_edge(v1, v4, 5.0);
+    g.add_edge(v2, v3, 1.0);
+    g.add_edge(v2, v4, 7.0);
+    g.add_edge(v3, v4, 1.0);
+
+    // Shortest path v1 to v4 should be v1 -> v2 -> v3 -> v4 (1 + 1 + 1 = 3)
+    auto result = graphix::vertex::algorithms::dijkstra(g, v1, v4);
+
+    CHECK(result.found);
+    CHECK(result.distance == 3.0);
+}
+
+TEST_CASE("Shortest path with Point properties") {
+    graphix::vertex::Graph<Point> g;
+
+    auto v1 = g.add_vertex(Point(0.0, 0.0));
+    auto v2 = g.add_vertex(Point(1.0, 0.0));
+    auto v3 = g.add_vertex(Point(2.0, 0.0));
+
+    g.add_edge(v1, v2, 1.0);
+    g.add_edge(v2, v3, 1.0);
+
+    auto result = graphix::vertex::algorithms::dijkstra(g, v1, v3);
+
+    CHECK(result.found);
+    CHECK(result.distance == 2.0);
+    CHECK(result.path.size() == 3);
+}
+
+TEST_CASE("Shortest path linear chain") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+    auto v4 = g.add_vertex();
+    auto v5 = g.add_vertex();
+
+    // Linear chain: v1 - v2 - v3 - v4 - v5
+    g.add_edge(v1, v2, 1.0);
+    g.add_edge(v2, v3, 1.0);
+    g.add_edge(v3, v4, 1.0);
+    g.add_edge(v4, v5, 1.0);
+
+    auto result = graphix::vertex::algorithms::dijkstra(g, v1, v5);
+
+    CHECK(result.found);
+    CHECK(result.distance == 4.0);
+    REQUIRE(result.path.size() == 5);
+    CHECK(result.path[0] == v1);
+    CHECK(result.path[4] == v5);
+}
+
+TEST_CASE("Shortest path with varying weights") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+    auto v4 = g.add_vertex();
+
+    // Diamond shape with different weights
+    g.add_edge(v1, v2, 1.0);
+    g.add_edge(v1, v3, 4.0);
+    g.add_edge(v2, v4, 2.0);
+    g.add_edge(v3, v4, 1.0);
+
+    // Shortest v1 to v4: v1 -> v2 -> v4 (1 + 2 = 3)
+    // vs v1 -> v3 -> v4 (4 + 1 = 5)
+    auto result = graphix::vertex::algorithms::dijkstra(g, v1, v4);
+
+    CHECK(result.found);
+    CHECK(result.distance == 3.0);
 }
