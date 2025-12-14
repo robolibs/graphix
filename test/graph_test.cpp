@@ -9,8 +9,8 @@ TEST_CASE("Vertex Graph exists") {
 }
 
 TEST_CASE("Factor Graph exists") {
-    graphix::factor::Graph fgraph;
-    CHECK(fgraph.factor_count() == 0);
+    graphix::factor::Graph<> fgraph;
+    CHECK(fgraph.size() == 0);
 }
 
 TEST_CASE("Factor exists") {
