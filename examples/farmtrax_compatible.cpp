@@ -1,0 +1,366 @@
+#include "graphix/vertex/algorithms/dijkstra.hpp"
+#include "graphix/vertex/graph.hpp"
+#include <chrono>
+#include <cmath>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <rerun.hpp>
+#include <set>
+#include <string>
+#include <thread>
+#include <vector>
+
+// This example demonstrates all Boost.Graph patterns used in farmtrax
+// Proves graphix can be a drop-in replacement for boost::graph
+
+// ============================================================================
+// Simulated farmtrax types (without external dependencies)
+// ============================================================================
+
+struct Point2D {
+    double x, y;
+    Point2D(double x = 0, double y = 0) : x(x), y(y) {}
+
+    double distance_to(const Point2D &other) const {
+        double dx = x - other.x;
+        double dy = y - other.y;
+        return std::sqrt(dx * dx + dy * dy);
+    }
+
+    bool operator==(const Point2D &other) const { return x == other.x && y == other.y; }
+};
+
+struct ABLine {
+    Point2D A, B;
+    std::string uuid;
+    size_t line_id;
+
+    ABLine(const Point2D &a, const Point2D &b, std::string uuid, size_t id) : A(a), B(b), uuid(uuid), line_id(id) {}
+
+    double length() const { return A.distance_to(B); }
+};
+
+struct Swath {
+    ABLine line;
+    std::string uuid;
+
+    Swath(const Point2D &a, const Point2D &b, std::string uuid, size_t id) : line(a, b, uuid, id), uuid(uuid) {}
+};
+
+// ============================================================================
+// Field Path Planning using graphix (mimics farmtrax::Nety)
+// ============================================================================
+
+class FieldPathPlanner {
+  public:
+    // Type aliases matching farmtrax patterns
+    using Graph = graphix::vertex::Graph<Point2D>;
+    using VertexId = typename Graph::VertexId;
+
+  private:
+    std::vector<ABLine> ab_lines_;
+    std::vector<std::shared_ptr<const Swath>> swaths_;
+    Graph graph_;
+    std::vector<VertexId> vertex_A_; // A endpoints for each line
+    std::vector<VertexId> vertex_B_; // B endpoints for each line
+
+  public:
+    // Constructor from swaths (mimics farmtrax::Nety constructor)
+    explicit FieldPathPlanner(const std::vector<std::shared_ptr<const Swath>> &swaths) : swaths_(swaths) {
+        ab_lines_.reserve(swaths_.size());
+        for (size_t i = 0; i < swaths_.size(); ++i) {
+            ab_lines_.emplace_back(swaths_[i]->line.A, swaths_[i]->line.B, swaths_[i]->uuid, i);
+        }
+        build_graph();
+    }
+
+    // Main shortest path function (mimics farmtrax shortest_path pattern)
+    void shortest_path(const Point2D &start, const Point2D &goal) {
+        if (ab_lines_.empty())
+            return;
+
+        std::cout << "\n=== Shortest Path Planning (farmtrax pattern) ===" << std::endl;
+
+        // Find start and goal vertices
+        auto [start_line, start_is_A] = find_closest_endpoint(start);
+        auto [goal_line, goal_is_A] = find_closest_endpoint(goal);
+
+        if (start_line == SIZE_MAX || goal_line == SIZE_MAX) {
+            std::cout << "Could not find valid start or goal endpoint" << std::endl;
+            return;
+        }
+
+        // Get vertex descriptors (farmtrax pattern: lines 151-152)
+        VertexId start_vertex = start_is_A ? vertex_A_[start_line] : vertex_B_[start_line];
+        VertexId goal_vertex = goal_is_A ? vertex_A_[goal_line] : vertex_B_[goal_line];
+
+        std::cout << "Start: Line " << start_line << (start_is_A ? " (A)" : " (B)") << std::endl;
+        std::cout << "Goal:  Line " << goal_line << (goal_is_A ? " (A)" : " (B)") << std::endl;
+
+        // FARMTRAX PATTERN 1: boost::num_vertices (line 157-158)
+        // Original: std::vector<double> distances(boost::num_vertices(graph_));
+        std::vector<double> distances(graphix::vertex::num_vertices(graph_));
+        std::vector<VertexId> predecessors(graphix::vertex::num_vertices(graph_));
+
+        std::cout << "Graph has " << graphix::vertex::num_vertices(graph_) << " vertices" << std::endl;
+
+        // FARMTRAX PATTERN 2: boost::dijkstra_shortest_paths (line 160-161)
+        // Original: boost::dijkstra_shortest_paths(graph_, start_vertex,
+        //              boost::predecessor_map(&predecessors[0]).distance_map(&distances[0]));
+        //
+        // Our implementation using graphix:
+        auto result = graphix::vertex::algorithms::dijkstra(graph_, start_vertex, goal_vertex);
+
+        if (!result.found) {
+            std::cout << "No path found (disconnected)" << std::endl;
+            return;
+        }
+
+        std::cout << "Path distance: " << result.distance << std::endl;
+
+        // FARMTRAX PATTERN 3: Path reconstruction (lines 164-171)
+        // Original used predecessors array, we have path directly
+        std::cout << "Path: ";
+        for (size_t i = 0; i < result.path.size(); ++i) {
+            auto v = result.path[i];
+            // Find which line this vertex belongs to
+            for (size_t line = 0; line < ab_lines_.size(); ++line) {
+                if (v == vertex_A_[line]) {
+                    std::cout << "L" << line << "A";
+                    break;
+                } else if (v == vertex_B_[line]) {
+                    std::cout << "L" << line << "B";
+                    break;
+                }
+            }
+            if (i < result.path.size() - 1)
+                std::cout << " -> ";
+        }
+        std::cout << std::endl;
+
+        // FARMTRAX PATTERN 4: boost::get(boost::vertex_name, graph_) (lines 201-202)
+        // Original: auto p1 = boost::get(boost::vertex_name, graph_)[path[i-1]];
+        // Our equivalent: direct property access with operator[]
+        std::cout << "\nPath coordinates:" << std::endl;
+        for (size_t i = 0; i < result.path.size(); ++i) {
+            const auto &point = graph_[result.path[i]];
+            std::cout << "  (" << point.x << ", " << point.y << ")";
+            if (i < result.path.size() - 1)
+                std::cout << " ->";
+            std::cout << std::endl;
+        }
+
+        // Calculate total distance (mimics calculate_path_distance, lines 198-206)
+        double total_distance = 0.0;
+        for (size_t i = 1; i < result.path.size(); ++i) {
+            // PATTERN: boost::get(boost::vertex_name, graph_)[vertex]
+            const auto &p1 = graph_[result.path[i - 1]];
+            const auto &p2 = graph_[result.path[i]];
+            total_distance += p1.distance_to(p2);
+        }
+        std::cout << "\nTotal path distance: " << total_distance << std::endl;
+    }
+
+    // Display graph statistics
+    void print_graph_stats() const {
+        std::cout << "\n=== Graph Statistics ===" << std::endl;
+        // PATTERN: boost::num_vertices and boost::num_edges
+        std::cout << "Vertices: " << graphix::vertex::num_vertices(graph_) << std::endl;
+        std::cout << "Edges: " << graphix::vertex::num_edges(graph_) << std::endl;
+        std::cout << "Lines: " << ab_lines_.size() << std::endl;
+    }
+
+    const Graph &get_graph() const { return graph_; }
+    const std::vector<ABLine> &get_ab_lines() const { return ab_lines_; }
+
+    // Visualize graph using Rerun GraphNodes/GraphEdges
+    void visualize_graph(std::shared_ptr<rerun::RecordingStream> rec) const {
+        if (!rec)
+            return;
+
+        // Collect node IDs
+        std::vector<std::string> node_ids;
+        std::map<VertexId, std::string> vertex_to_node_id;
+
+        for (size_t i = 0; i < ab_lines_.size(); ++i) {
+            std::string node_id_A = "L" + std::to_string(i) + "A";
+            std::string node_id_B = "L" + std::to_string(i) + "B";
+
+            node_ids.push_back(node_id_A);
+            node_ids.push_back(node_id_B);
+
+            vertex_to_node_id[vertex_A_[i]] = node_id_A;
+            vertex_to_node_id[vertex_B_[i]] = node_id_B;
+        }
+
+        // Collect edges
+        std::vector<rerun::components::GraphEdge> graph_edges;
+        auto edges = graph_.edges();
+        for (const auto &edge : edges) {
+            auto src = graph_.source(edge.id);
+            auto tgt = graph_.target(edge.id);
+
+            auto src_it = vertex_to_node_id.find(src);
+            auto tgt_it = vertex_to_node_id.find(tgt);
+
+            if (src_it != vertex_to_node_id.end() && tgt_it != vertex_to_node_id.end()) {
+                graph_edges.push_back({src_it->second, tgt_it->second});
+            }
+        }
+
+        // Log graph
+        rec->log_static("graph", rerun::GraphNodes(node_ids), rerun::GraphEdges(graph_edges));
+    }
+
+  private:
+    // Build graph structure (mimics farmtrax build_graph, lines 291-321)
+    void build_graph() {
+        if (ab_lines_.empty())
+            return;
+
+        vertex_A_.resize(ab_lines_.size());
+        vertex_B_.resize(ab_lines_.size());
+
+        std::cout << "\n=== Building Graph (farmtrax pattern) ===" << std::endl;
+
+        // FARMTRAX PATTERN 5: boost::add_vertex with properties (lines 303, 307)
+        // Original: vertex_A_[i] = boost::add_vertex(VertexProps{line.A}, graph_);
+        for (size_t i = 0; i < ab_lines_.size(); ++i) {
+            const auto &line = ab_lines_[i];
+
+            // Add A endpoint with Point2D property
+            vertex_A_[i] = graphix::vertex::add_vertex(line.A, graph_);
+
+            // Add B endpoint with Point2D property
+            vertex_B_[i] = graphix::vertex::add_vertex(line.B, graph_);
+
+            // FARMTRAX PATTERN 6: boost::add_edge with weight (line 311)
+            // Original: boost::add_edge(vertex_A_[i], vertex_B_[i], EdgeProps{line.length()}, graph_);
+            graphix::vertex::add_edge(vertex_A_[i], vertex_B_[i], line.length(), graph_);
+
+            std::cout << "Line " << i << ": A(" << line.A.x << "," << line.A.y << ") to B(" << line.B.x << ","
+                      << line.B.y << ") length=" << line.length() << std::endl;
+        }
+
+        // Add connections between lines (simplified version)
+        add_line_connections();
+    }
+
+    // Add connections between adjacent lines
+    void add_line_connections() {
+        const double max_connection_dist = 50.0; // Maximum distance to connect lines
+
+        for (size_t i = 0; i < ab_lines_.size(); ++i) {
+            for (size_t j = i + 1; j < ab_lines_.size(); ++j) {
+                // Try connecting all endpoint combinations
+                connect_if_close(vertex_A_[i], ab_lines_[i].A, vertex_A_[j], ab_lines_[j].A, max_connection_dist);
+                connect_if_close(vertex_A_[i], ab_lines_[i].A, vertex_B_[j], ab_lines_[j].B, max_connection_dist);
+                connect_if_close(vertex_B_[i], ab_lines_[i].B, vertex_A_[j], ab_lines_[j].A, max_connection_dist);
+                connect_if_close(vertex_B_[i], ab_lines_[i].B, vertex_B_[j], ab_lines_[j].B, max_connection_dist);
+            }
+        }
+    }
+
+    void connect_if_close(VertexId v1, const Point2D &p1, VertexId v2, const Point2D &p2, double max_dist) {
+        double dist = p1.distance_to(p2);
+        if (dist <= max_dist && !graph_.has_edge(v1, v2)) {
+            graphix::vertex::add_edge(v1, v2, dist, graph_);
+        }
+    }
+
+    // Find closest endpoint to a point
+    std::pair<size_t, bool> find_closest_endpoint(const Point2D &point) const {
+        double min_dist = std::numeric_limits<double>::max();
+        size_t best_line = SIZE_MAX;
+        bool best_is_A = true;
+
+        for (size_t i = 0; i < ab_lines_.size(); ++i) {
+            double dist_A = point.distance_to(ab_lines_[i].A);
+            double dist_B = point.distance_to(ab_lines_[i].B);
+
+            if (dist_A < min_dist) {
+                min_dist = dist_A;
+                best_line = i;
+                best_is_A = true;
+            }
+            if (dist_B < min_dist) {
+                min_dist = dist_B;
+                best_line = i;
+                best_is_A = false;
+            }
+        }
+
+        return {best_line, best_is_A};
+    }
+};
+
+// ============================================================================
+// Main - Demonstrate farmtrax patterns work with graphix
+// ============================================================================
+
+int main() {
+    std::cout << "=== Farmtrax Compatibility Demo ===" << std::endl;
+    std::cout << "Demonstrating all Boost.Graph patterns used in farmtrax" << std::endl;
+
+#ifdef HAS_RERUN
+    // Initialize Rerun for visualization (drivekit pattern)
+    auto rec = std::make_shared<rerun::RecordingStream>("farmtrax_compatible", "graph");
+    if (rec->connect_grpc("rerun+http://0.0.0.0:9876/proxy").is_err()) {
+        std::cerr << "Failed to connect to rerun (server might not be running)\n";
+        std::cerr << "Run: rerun --serve &\n";
+        std::cerr << "Continuing without visualization...\n";
+        rec = nullptr;
+    } else {
+        rec->log_static("", rerun::Clear::RECURSIVE);
+        std::cout << "\nRerun visualization connected! View at http://localhost:9876" << std::endl;
+    }
+#endif
+
+    // Create field lines (parallel swaths like in agricultural field)
+    std::vector<std::shared_ptr<const Swath>> swaths;
+
+    // Create 5 parallel vertical lines (like crop rows)
+    for (size_t i = 0; i < 5; ++i) {
+        double x = i * 20.0; // 20 units apart
+        auto swath = std::make_shared<Swath>(Point2D(x, 0), Point2D(x, 100), "swath_" + std::to_string(i), i);
+        swaths.push_back(swath);
+    }
+
+    // Create field path planner
+    FieldPathPlanner planner(swaths);
+
+    // Show graph statistics
+    planner.print_graph_stats();
+
+    // Test shortest path (similar to farmtrax usage)
+    Point2D start_point(0, 0);   // Bottom of first line
+    Point2D goal_point(80, 100); // Top of last line
+
+    planner.shortest_path(start_point, goal_point);
+
+#ifdef HAS_RERUN
+    // Visualize the graph
+    std::cout << "\nVisualizing graph in Rerun..." << std::endl;
+    planner.visualize_graph(rec);
+    std::cout << "Visualization complete! Check Rerun viewer." << std::endl;
+#endif
+
+    std::cout << "\n=== Boost.Graph Patterns Successfully Replaced ===" << std::endl;
+    std::cout << "\nKey farmtrax patterns demonstrated:" << std::endl;
+    std::cout << "  1. boost::num_vertices(graph)     -> graphix::vertex::num_vertices(graph)" << std::endl;
+    std::cout << "  2. boost::num_edges(graph)        -> graphix::vertex::num_edges(graph)" << std::endl;
+    std::cout << "  3. boost::add_vertex(props, g)    -> graphix::vertex::add_vertex(props, g)" << std::endl;
+    std::cout << "  4. boost::add_edge(u, v, w, g)    -> graphix::vertex::add_edge(u, v, w, g)" << std::endl;
+    std::cout << "  5. boost::dijkstra_shortest_paths -> graphix::vertex::algorithms::dijkstra" << std::endl;
+    std::cout << "  6. boost::get(vertex_name, g)[v]  -> g[v] (direct property access)" << std::endl;
+    std::cout << "\nAll patterns work! Ready for farmtrax integration." << std::endl;
+
+#ifdef HAS_RERUN
+    std::cout << "\nKeep terminal open to view visualization..." << std::endl;
+    std::cout << "Press Ctrl+C to exit." << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(60)); // Keep alive for 60 seconds
+#endif
+
+    return 0;
+}
