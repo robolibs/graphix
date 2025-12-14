@@ -1,10 +1,10 @@
 #include "graphix/factor/factor.hpp"
 #include "graphix/factor/graph.hpp"
-#include "graphix/vertice/graph.hpp"
+#include "graphix/vertex/graph.hpp"
 #include <doctest/doctest.h>
 
-TEST_CASE("Vertice Graph exists") {
-    graphix::vertice::Graph vgraph;
+TEST_CASE("Vertex Graph exists") {
+    graphix::vertex::Graph vgraph;
     CHECK(vgraph.node_count() == 0);
     CHECK(vgraph.edge_count() == 0);
 }

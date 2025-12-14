@@ -4,7 +4,7 @@
 #include <vector>
 
 namespace graphix {
-    namespace vertice {
+    namespace vertex {
 
         class Graph {
           public:
@@ -24,5 +24,5 @@ namespace graphix {
             std::vector<std::pair<NodeId, NodeId>> m_edges;
         };
 
-    } // namespace vertice
+    } // namespace vertex
 } // namespace graphix

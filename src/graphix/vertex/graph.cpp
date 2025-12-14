@@ -1,7 +1,7 @@
-#include "graphix/vertice/graph.hpp"
+#include "graphix/vertex/graph.hpp"
 
 namespace graphix {
-    namespace vertice {
+    namespace vertex {
 
         Graph::Graph() = default;
 
@@ -21,5 +21,5 @@ namespace graphix {
 
         size_t Graph::edge_count() const { return m_edges.size(); }
 
-    } // namespace vertice
+    } // namespace vertex
 } // namespace graphix
