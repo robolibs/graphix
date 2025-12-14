@@ -161,7 +161,7 @@ end
 
 -- Tests (only build when graphix is the main project)
 if has_config("tests") and os.projectdir() == os.curdir() then
-    for _, filepath in ipairs(os.files("test/*.cpp")) do
+    for _, filepath in ipairs(os.files("test/**.cpp")) do
         local filename = path.basename(filepath)
         target(filename)
             set_kind("binary")
