@@ -39,6 +39,19 @@ namespace graphix::factor {
         double error(const Values &values) const override;
 
         /**
+         * @brief Get dimension of variable (always 3 for Vec3d)
+         */
+        size_t dim(Key) const override { return 3; }
+
+        /**
+         * @brief Compute error vector for linearization
+         *
+         * Returns the weighted residual: (x - prior) ./ sigma
+         * where ./ is element-wise division
+         */
+        std::vector<double> error_vector(const Values &values) const override;
+
+        /**
          * @brief Get prior value
          */
         const Vec3d &prior() const { return prior_; }

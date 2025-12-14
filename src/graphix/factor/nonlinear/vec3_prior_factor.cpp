@@ -28,4 +28,14 @@ namespace graphix::factor {
         return 0.5 * error;
     }
 
+    std::vector<double> Vec3PriorFactor::error_vector(const Values &values) const {
+        // Get the variable value
+        Vec3d x = values.at<Vec3d>(keys()[0]);
+
+        // Compute weighted residual: (x - prior) / sigma
+        Vec3d diff = x - prior_;
+
+        return {diff.x() / sigmas_.x(), diff.y() / sigmas_.y(), diff.z() / sigmas_.z()};
+    }
+
 } // namespace graphix::factor

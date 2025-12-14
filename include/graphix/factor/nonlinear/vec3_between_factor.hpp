@@ -46,6 +46,18 @@ namespace graphix::factor {
         double error(const Values &values) const override;
 
         /**
+         * @brief Get dimension of variable (always 3 for Vec3d)
+         */
+        size_t dim(Key) const override { return 3; }
+
+        /**
+         * @brief Compute error vector for linearization
+         *
+         * Returns the weighted residual: (predicted - measured) ./ sigma
+         */
+        std::vector<double> error_vector(const Values &values) const override;
+
+        /**
          * @brief Get measured value
          */
         const Vec3d &measured() const { return measured_; }

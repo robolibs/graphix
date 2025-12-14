@@ -60,4 +60,33 @@ namespace graphix::factor {
         return 0.5 * error;
     }
 
+    std::vector<double> Vec3BetweenFactor::error_vector(const Values &values) const {
+        // Get the two variable values
+        Vec3d vi = values.at<Vec3d>(keys()[0]);
+        Vec3d vj = values.at<Vec3d>(keys()[1]);
+
+        // Interpret Vec3d as 2D pose (x, y, theta).
+        // Measurement is in the local frame of pose i (odometry-style).
+        const double theta_i = vi.z();
+        const double dx_world = vj.x() - vi.x();
+        const double dy_world = vj.y() - vi.y();
+
+        // Rotate world delta into i frame: R(-theta_i) * (t_j - t_i)
+        const double c = std::cos(theta_i);
+        const double s = std::sin(theta_i);
+        const double dx_local = c * dx_world + s * dy_world;
+        const double dy_local = -s * dx_world + c * dy_world;
+
+        const double dtheta = wrap_angle_pi(vj.z() - vi.z());
+
+        Vec3d predicted(dx_local, dy_local, dtheta);
+
+        // Residual (wrap angle component)
+        Vec3d diff = predicted - measured_;
+        diff.z() = wrap_angle_pi(diff.z());
+
+        // Return weighted residual
+        return {diff.x() / sigmas_.x(), diff.y() / sigmas_.y(), diff.z() / sigmas_.z()};
+    }
+
 } // namespace graphix::factor
