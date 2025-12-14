@@ -1,5 +1,9 @@
 #include "graphix/vertex/graph.hpp"
 #include <algorithm>
+#include <fstream>
+#include <map>
+#include <regex>
+#include <sstream>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -260,6 +264,166 @@ namespace graphix {
 
             // Remove vertex from storage
             m_vertices.remove(Id<int>(v));
+        }
+
+        // Serialization for void specialization
+        void Graph<void>::save_dot(const std::string &filename) const {
+            std::ofstream out(filename);
+            if (!out.is_open()) {
+                throw std::runtime_error("Failed to open file for writing: " + filename);
+            }
+
+            // Check if we have any directed edges
+            bool has_directed = false;
+            for (const auto &edge_desc : edges()) {
+                if (edge_desc.type == EdgeType::Directed) {
+                    has_directed = true;
+                    break;
+                }
+            }
+
+            // Header - use digraph if ANY directed edges exist
+            out << (has_directed ? "digraph" : "graph") << " G {\n";
+
+            // Write vertices
+            for (auto v : vertices()) {
+                out << "  v" << v << ";\n";
+            }
+
+            // Write edges (edges() already deduplicates for us)
+            for (const auto &edge : edges()) {
+                if (edge.type == EdgeType::Directed) {
+                    out << "  v" << edge.source << " -> v" << edge.target;
+                } else {
+                    if (has_directed) {
+                        // In a digraph, undirected edges need special marking
+                        out << "  v" << edge.source << " -> v" << edge.target;
+                    } else {
+                        // In pure undirected graph, use --
+                        out << "  v" << edge.source << " -- v" << edge.target;
+                    }
+                }
+                out << " [weight=" << edge.weight;
+                if (has_directed && edge.type == EdgeType::Undirected) {
+                    out << ",dir=none"; // Mark undirected edges in mixed graphs
+                }
+                out << "];\n";
+            }
+
+            out << "}\n";
+            out.close();
+        }
+
+        Graph<void> Graph<void>::load_dot(const std::string &filename) {
+            std::ifstream in(filename);
+            if (!in.is_open()) {
+                throw std::runtime_error("Failed to open file for reading: " + filename);
+            }
+
+            Graph<void> g;
+            std::map<std::string, VertexId> id_map;
+            bool is_directed = false;
+
+            std::string line;
+            while (std::getline(in, line)) {
+                // Remove comments
+                size_t comment_pos = line.find("//");
+                if (comment_pos != std::string::npos) {
+                    line = line.substr(0, comment_pos);
+                }
+
+                // Trim whitespace
+                line.erase(0, line.find_first_not_of(" \t\r\n"));
+                line.erase(line.find_last_not_of(" \t\r\n") + 1);
+
+                // Check for graph type declaration
+                if (line.find("digraph") != std::string::npos) {
+                    is_directed = true;
+                    continue;
+                } else if (line.find("graph") != std::string::npos && line.find("digraph") == std::string::npos) {
+                    is_directed = false;
+                    continue;
+                }
+
+                // Skip empty lines and closing brace
+                if (line.empty() || line == "}") {
+                    continue;
+                }
+
+                // Parse vertex declaration: "v123;"
+                std::regex vertex_regex(R"(v(\d+);)");
+                std::smatch vertex_match;
+                if (std::regex_search(line, vertex_match, vertex_regex)) {
+                    std::string vertex_name = "v" + vertex_match[1].str();
+                    if (id_map.find(vertex_name) == id_map.end()) {
+                        VertexId new_id = g.add_vertex();
+                        id_map[vertex_name] = new_id;
+                    }
+                    continue;
+                }
+
+                // Parse directed edge: "v0 -> v1 [weight=1.5];" or "v0 -> v1 [weight=1.5,dir=none];"
+                std::regex directed_edge_regex(R"(v(\d+)\s*->\s*v(\d+)\s*\[([^\]]*)\])");
+                std::smatch edge_match;
+                if (std::regex_search(line, edge_match, directed_edge_regex)) {
+                    std::string src_name = "v" + edge_match[1].str();
+                    std::string tgt_name = "v" + edge_match[2].str();
+                    std::string attrs = edge_match[3].str();
+
+                    // Create vertices if they don't exist
+                    if (id_map.find(src_name) == id_map.end()) {
+                        id_map[src_name] = g.add_vertex();
+                    }
+                    if (id_map.find(tgt_name) == id_map.end()) {
+                        id_map[tgt_name] = g.add_vertex();
+                    }
+
+                    // Parse weight
+                    double weight = 1.0;
+                    std::regex weight_regex(R"(weight=([0-9.]+))");
+                    std::smatch weight_match;
+                    if (std::regex_search(attrs, weight_match, weight_regex)) {
+                        weight = std::stod(weight_match[1].str());
+                    }
+
+                    // Check for dir=none (undirected edge in digraph)
+                    bool is_undirected = (attrs.find("dir=none") != std::string::npos);
+
+                    EdgeType edge_type = is_undirected ? EdgeType::Undirected : EdgeType::Directed;
+                    g.add_edge(id_map[src_name], id_map[tgt_name], weight, edge_type);
+                    continue;
+                }
+
+                // Parse undirected edge: "v0 -- v1 [weight=1.5];"
+                std::regex undirected_edge_regex(R"(v(\d+)\s*--\s*v(\d+)\s*\[([^\]]*)\])");
+                if (std::regex_search(line, edge_match, undirected_edge_regex)) {
+                    std::string src_name = "v" + edge_match[1].str();
+                    std::string tgt_name = "v" + edge_match[2].str();
+                    std::string attrs = edge_match[3].str();
+
+                    // Create vertices if they don't exist
+                    if (id_map.find(src_name) == id_map.end()) {
+                        id_map[src_name] = g.add_vertex();
+                    }
+                    if (id_map.find(tgt_name) == id_map.end()) {
+                        id_map[tgt_name] = g.add_vertex();
+                    }
+
+                    // Parse weight
+                    double weight = 1.0;
+                    std::regex weight_regex(R"(weight=([0-9.]+))");
+                    std::smatch weight_match;
+                    if (std::regex_search(attrs, weight_match, weight_regex)) {
+                        weight = std::stod(weight_match[1].str());
+                    }
+
+                    g.add_edge(id_map[src_name], id_map[tgt_name], weight, EdgeType::Undirected);
+                    continue;
+                }
+            }
+
+            in.close();
+            return g;
         }
 
     } // namespace vertex
