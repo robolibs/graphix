@@ -1112,3 +1112,245 @@ TEST_CASE("Boost-style mixed usage") {
     CHECK(graphix::vertex::degree(v2, g) == 2); // Free function
     CHECK(g.degree(v1) == 1);                   // Member function
 }
+
+// ============================================================================
+// Step 8: Edge Query Functions
+// ============================================================================
+
+TEST_CASE("get_edge - edge exists") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    auto e1 = g.add_edge(v1, v2, 1.5);
+    auto e2 = g.add_edge(v2, v3, 2.5);
+
+    auto result = g.get_edge(v1, v2);
+    CHECK(result.has_value());
+    CHECK(result.value() == e1);
+
+    auto result2 = g.get_edge(v2, v3);
+    CHECK(result2.has_value());
+    CHECK(result2.value() == e2);
+
+    // Undirected - should work both ways
+    auto result3 = g.get_edge(v2, v1);
+    CHECK(result3.has_value());
+    CHECK(result3.value() == e1);
+}
+
+TEST_CASE("get_edge - edge does not exist") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    g.add_edge(v1, v2);
+
+    auto result = g.get_edge(v1, v3);
+    CHECK_FALSE(result.has_value());
+
+    auto result2 = g.get_edge(v2, v3);
+    CHECK_FALSE(result2.has_value());
+}
+
+TEST_CASE("get_edge - with properties") {
+    graphix::vertex::Graph<int> g;
+
+    auto v1 = g.add_vertex(100);
+    auto v2 = g.add_vertex(200);
+
+    auto e = g.add_edge(v1, v2, 5.0);
+
+    auto result = g.get_edge(v1, v2);
+    CHECK(result.has_value());
+    CHECK(result.value() == e);
+}
+
+TEST_CASE("edge function - Boost style") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    auto e1 = g.add_edge(v1, v2);
+
+    auto [edge_id, exists] = g.edge(v1, v2);
+    CHECK(exists);
+    CHECK(edge_id == e1);
+
+    auto [edge_id2, exists2] = g.edge(v1, v3);
+    CHECK_FALSE(exists2);
+}
+
+TEST_CASE("source function") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    auto e1 = g.add_edge(v1, v2);
+    auto e2 = g.add_edge(v2, v3);
+
+    // For undirected graph, source is the first vertex in add_edge
+    CHECK(g.source(e1) == v1);
+    CHECK(g.source(e2) == v2);
+}
+
+TEST_CASE("target function") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    auto e1 = g.add_edge(v1, v2);
+    auto e2 = g.add_edge(v2, v3);
+
+    CHECK(g.target(e1) == v2);
+    CHECK(g.target(e2) == v3);
+}
+
+TEST_CASE("source and target with properties") {
+    graphix::vertex::Graph<int> g;
+
+    auto v1 = g.add_vertex(100);
+    auto v2 = g.add_vertex(200);
+    auto v3 = g.add_vertex(300);
+
+    auto e = g.add_edge(v1, v2);
+
+    CHECK(g.source(e) == v1);
+    CHECK(g.target(e) == v2);
+    CHECK(g[g.source(e)] == 100);
+    CHECK(g[g.target(e)] == 200);
+}
+
+TEST_CASE("source throws on invalid edge") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+
+    g.add_edge(v1, v2);
+
+    CHECK_THROWS_AS(g.source(999), std::invalid_argument);
+}
+
+TEST_CASE("target throws on invalid edge") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+
+    g.add_edge(v1, v2);
+
+    CHECK_THROWS_AS(g.target(999), std::invalid_argument);
+}
+
+TEST_CASE("Boost-style get_edge") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = graphix::vertex::add_vertex(g);
+    auto v2 = graphix::vertex::add_vertex(g);
+
+    auto e = graphix::vertex::add_edge(v1, v2, g);
+
+    auto result = graphix::vertex::get_edge(v1, v2, g);
+    CHECK(result.has_value());
+    CHECK(result.value() == e);
+
+    auto result2 = graphix::vertex::get_edge(v2, v1, g);
+    CHECK(result2.has_value());
+    CHECK(result2.value() == e);
+}
+
+TEST_CASE("Boost-style edge function") {
+    graphix::vertex::Graph<int> g;
+
+    auto v1 = graphix::vertex::add_vertex(100, g);
+    auto v2 = graphix::vertex::add_vertex(200, g);
+    auto v3 = graphix::vertex::add_vertex(300, g);
+
+    auto e1 = graphix::vertex::add_edge(v1, v2, 5.0, g);
+
+    auto [edge_id, exists] = graphix::vertex::edge(v1, v2, g);
+    CHECK(exists);
+    CHECK(edge_id == e1);
+
+    auto [edge_id2, exists2] = graphix::vertex::edge(v1, v3, g);
+    CHECK_FALSE(exists2);
+}
+
+TEST_CASE("Boost-style source and target") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = graphix::vertex::add_vertex(g);
+    auto v2 = graphix::vertex::add_vertex(g);
+    auto v3 = graphix::vertex::add_vertex(g);
+
+    auto e1 = graphix::vertex::add_edge(v1, v2, 1.0, g);
+    auto e2 = graphix::vertex::add_edge(v2, v3, 2.0, g);
+
+    CHECK(graphix::vertex::source(e1, g) == v1);
+    CHECK(graphix::vertex::target(e1, g) == v2);
+    CHECK(graphix::vertex::source(e2, g) == v2);
+    CHECK(graphix::vertex::target(e2, g) == v3);
+}
+
+TEST_CASE("Edge query complete workflow") {
+    graphix::vertex::Graph<int> g;
+
+    auto v1 = g.add_vertex(100);
+    auto v2 = g.add_vertex(200);
+    auto v3 = g.add_vertex(300);
+    auto v4 = g.add_vertex(400);
+
+    auto e1 = g.add_edge(v1, v2, 1.5);
+    auto e2 = g.add_edge(v2, v3, 2.5);
+    auto e3 = g.add_edge(v3, v4, 3.5);
+
+    // Verify all edges
+    for (const auto &edge : g.edges()) {
+        auto src = g.source(edge.id);
+        auto tgt = g.target(edge.id);
+
+        CHECK(g.has_vertex(src));
+        CHECK(g.has_vertex(tgt));
+        CHECK(g.has_edge(src, tgt));
+
+        // Verify we can get the edge back
+        auto opt = g.get_edge(src, tgt);
+        CHECK(opt.has_value());
+        CHECK(opt.value() == edge.id);
+    }
+}
+
+TEST_CASE("Edge queries after modification") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    auto e1 = g.add_edge(v1, v2);
+    auto e2 = g.add_edge(v2, v3);
+
+    CHECK(g.get_edge(v1, v2).has_value());
+    CHECK(g.get_edge(v2, v3).has_value());
+
+    // Remove edge
+    g.remove_edge(e1);
+
+    CHECK_FALSE(g.get_edge(v1, v2).has_value());
+    CHECK(g.get_edge(v2, v3).has_value());
+
+    // source/target should still work for remaining edge
+    CHECK(g.source(e2) == v2);
+    CHECK(g.target(e2) == v3);
+}

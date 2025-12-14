@@ -26,10 +26,10 @@ namespace graphix {
             graphix::vertex::EdgeId edge_id = m_next_edge_id++;
 
             // Add edge u -> v
-            m_adjacency[u].push_back({v, weight, edge_id});
+            m_adjacency[u].push_back({u, v, weight, edge_id});
 
             // Add edge v -> u (undirected graph)
-            m_adjacency[v].push_back({u, weight, edge_id});
+            m_adjacency[v].push_back({v, u, weight, edge_id});
 
             m_edge_count++;
             return edge_id;
@@ -77,6 +77,72 @@ namespace graphix {
         }
 
         size_t Graph<void>::edge_count() const { return m_edge_count; }
+
+        // Edge query functions for void specialization
+        std::optional<graphix::vertex::EdgeId> Graph<void>::get_edge(VertexId u, VertexId v) const {
+            auto it = m_adjacency.find(u);
+            if (it == m_adjacency.end()) {
+                return std::nullopt;
+            }
+            for (const auto &edge : it->second) {
+                if (edge.target == v) {
+                    return edge.id;
+                }
+            }
+            return std::nullopt;
+        }
+
+        std::pair<graphix::vertex::EdgeId, bool> Graph<void>::edge(VertexId u, VertexId v) const {
+            auto opt = get_edge(u, v);
+            if (opt.has_value()) {
+                return {opt.value(), true};
+            }
+            return {0, false};
+        }
+
+        Graph<void>::VertexId Graph<void>::source(graphix::vertex::EdgeId e) const {
+            // Search through all adjacency lists to find edge with this ID
+            // Return the canonical direction (smaller vertex as source)
+            VertexId found_src = 0, found_tgt = 0;
+            bool found = false;
+            for (const auto &[vertex, edges] : m_adjacency) {
+                for (const auto &edge : edges) {
+                    if (edge.id == e) {
+                        if (!found || edge.source < found_src) {
+                            found_src = edge.source;
+                            found_tgt = edge.target;
+                            found = true;
+                        }
+                    }
+                }
+            }
+            if (!found) {
+                throw std::invalid_argument("Edge ID not found");
+            }
+            return found_src;
+        }
+
+        Graph<void>::VertexId Graph<void>::target(graphix::vertex::EdgeId e) const {
+            // Search through all adjacency lists to find edge with this ID
+            // Return the canonical direction (smaller vertex as source)
+            VertexId found_src = 0, found_tgt = 0;
+            bool found = false;
+            for (const auto &[vertex, edges] : m_adjacency) {
+                for (const auto &edge : edges) {
+                    if (edge.id == e) {
+                        if (!found || edge.source < found_src) {
+                            found_src = edge.source;
+                            found_tgt = edge.target;
+                            found = true;
+                        }
+                    }
+                }
+            }
+            if (!found) {
+                throw std::invalid_argument("Edge ID not found");
+            }
+            return found_tgt;
+        }
 
         // Adjacency and neighbor queries for void specialization
         std::vector<Graph<void>::VertexId> Graph<void>::neighbors(VertexId v) const {

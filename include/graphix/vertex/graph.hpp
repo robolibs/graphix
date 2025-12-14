@@ -45,6 +45,12 @@ namespace graphix {
             void set_weight(EdgeId e, double weight);
             size_t edge_count() const;
 
+            // Edge query functions
+            std::optional<EdgeId> get_edge(VertexId u, VertexId v) const;
+            std::pair<EdgeId, bool> edge(VertexId u, VertexId v) const;
+            VertexId source(EdgeId e) const;
+            VertexId target(EdgeId e) const;
+
             // Adjacency and neighbor queries
             std::vector<VertexId> neighbors(VertexId v) const;
             size_t degree(VertexId v) const;
@@ -61,6 +67,7 @@ namespace graphix {
 
           private:
             struct Edge {
+                VertexId source;
                 VertexId target;
                 double weight;
                 EdgeId id;
@@ -93,6 +100,12 @@ namespace graphix {
             void set_weight(EdgeId e, double weight);
             size_t edge_count() const;
 
+            // Edge query functions
+            std::optional<EdgeId> get_edge(VertexId u, VertexId v) const;
+            std::pair<EdgeId, bool> edge(VertexId u, VertexId v) const;
+            VertexId source(EdgeId e) const;
+            VertexId target(EdgeId e) const;
+
             // Adjacency and neighbor queries
             std::vector<VertexId> neighbors(VertexId v) const;
             size_t degree(VertexId v) const;
@@ -109,6 +122,7 @@ namespace graphix {
 
           private:
             struct Edge {
+                VertexId source;
                 VertexId target;
                 double weight;
                 EdgeId id;
@@ -158,10 +172,10 @@ namespace graphix {
             EdgeId edge_id = m_next_edge_id++;
 
             // Add edge u -> v
-            m_adjacency[u].push_back({v, weight, edge_id});
+            m_adjacency[u].push_back({u, v, weight, edge_id});
 
             // Add edge v -> u (undirected graph)
-            m_adjacency[v].push_back({u, weight, edge_id});
+            m_adjacency[v].push_back({v, u, weight, edge_id});
 
             m_edge_count++;
             return edge_id;
@@ -209,6 +223,76 @@ namespace graphix {
         }
 
         template <typename VertexProperty> size_t Graph<VertexProperty>::edge_count() const { return m_edge_count; }
+
+        // Edge query functions
+        template <typename VertexProperty>
+        std::optional<EdgeId> Graph<VertexProperty>::get_edge(VertexId u, VertexId v) const {
+            auto it = m_adjacency.find(u);
+            if (it == m_adjacency.end()) {
+                return std::nullopt;
+            }
+            for (const auto &edge : it->second) {
+                if (edge.target == v) {
+                    return edge.id;
+                }
+            }
+            return std::nullopt;
+        }
+
+        template <typename VertexProperty>
+        std::pair<EdgeId, bool> Graph<VertexProperty>::edge(VertexId u, VertexId v) const {
+            auto opt = get_edge(u, v);
+            if (opt.has_value()) {
+                return {opt.value(), true};
+            }
+            return {0, false};
+        }
+
+        template <typename VertexProperty>
+        typename Graph<VertexProperty>::VertexId Graph<VertexProperty>::source(EdgeId e) const {
+            // Search through all adjacency lists to find edge with this ID
+            // Return the canonical direction (smaller vertex as source)
+            VertexId found_src = 0, found_tgt = 0;
+            bool found = false;
+            for (const auto &[vertex, edges] : m_adjacency) {
+                for (const auto &edge : edges) {
+                    if (edge.id == e) {
+                        if (!found || edge.source < found_src) {
+                            found_src = edge.source;
+                            found_tgt = edge.target;
+                            found = true;
+                        }
+                    }
+                }
+            }
+            if (!found) {
+                throw std::invalid_argument("Edge ID not found");
+            }
+            return found_src;
+        }
+
+        template <typename VertexProperty>
+        typename Graph<VertexProperty>::VertexId Graph<VertexProperty>::target(EdgeId e) const {
+            // Search through all adjacency lists to find edge with this ID
+            // Return the canonical direction (smaller vertex as source)
+            VertexId found_src = 0, found_tgt = 0;
+            bool found = false;
+            for (const auto &[vertex, edges] : m_adjacency) {
+                for (const auto &edge : edges) {
+                    if (edge.id == e) {
+                        if (!found || edge.source < found_src) {
+                            found_src = edge.source;
+                            found_tgt = edge.target;
+                            found = true;
+                        }
+                    }
+                }
+            }
+            if (!found) {
+                throw std::invalid_argument("Edge ID not found");
+            }
+            return found_tgt;
+        }
 
         // Adjacency and neighbor queries
         template <typename VertexProperty>
@@ -440,6 +524,43 @@ namespace graphix {
         inline void remove_edge(Graph<void>::VertexId u, Graph<void>::VertexId v, Graph<void> &g) {
             g.remove_edge(u, v);
         }
+
+        // Edge query functions
+        template <typename VertexProperty>
+        inline std::optional<EdgeId> get_edge(typename Graph<VertexProperty>::VertexId u,
+                                              typename Graph<VertexProperty>::VertexId v,
+                                              const Graph<VertexProperty> &g) {
+            return g.get_edge(u, v);
+        }
+
+        inline std::optional<EdgeId> get_edge(Graph<void>::VertexId u, Graph<void>::VertexId v, const Graph<void> &g) {
+            return g.get_edge(u, v);
+        }
+
+        template <typename VertexProperty>
+        inline std::pair<EdgeId, bool> edge(typename Graph<VertexProperty>::VertexId u,
+                                            typename Graph<VertexProperty>::VertexId v,
+                                            const Graph<VertexProperty> &g) {
+            return g.edge(u, v);
+        }
+
+        inline std::pair<EdgeId, bool> edge(Graph<void>::VertexId u, Graph<void>::VertexId v, const Graph<void> &g) {
+            return g.edge(u, v);
+        }
+
+        template <typename VertexProperty>
+        inline typename Graph<VertexProperty>::VertexId source(EdgeId e, const Graph<VertexProperty> &g) {
+            return g.source(e);
+        }
+
+        inline Graph<void>::VertexId source(EdgeId e, const Graph<void> &g) { return g.source(e); }
+
+        template <typename VertexProperty>
+        inline typename Graph<VertexProperty>::VertexId target(EdgeId e, const Graph<VertexProperty> &g) {
+            return g.target(e);
+        }
+
+        inline Graph<void>::VertexId target(EdgeId e, const Graph<void> &g) { return g.target(e); }
 
     } // namespace vertex
 } // namespace graphix
