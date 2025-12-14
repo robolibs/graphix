@@ -14,44 +14,12 @@ namespace graphix {
 
     template <typename T, size_t N> class SmallVec {
       public:
-        SmallVec() : m_size(0), m_using_heap(false) {}
+        SmallVec() = default;
 
-        SmallVec(std::initializer_list<T> init) : m_size(0), m_using_heap(false) {
+        SmallVec(std::initializer_list<T> init) {
             for (const auto &val : init) {
                 push_back(val);
             }
-        }
-
-        ~SmallVec() {
-            if (m_using_heap) {
-                m_heap.~vector();
-            }
-        }
-
-        // Copy constructor
-        SmallVec(const SmallVec &other) : m_size(other.m_size), m_using_heap(other.m_using_heap) {
-            if (m_using_heap) {
-                new (&m_heap) std::vector<T>(other.m_heap);
-            } else {
-                m_inline = other.m_inline;
-            }
-        }
-
-        // Copy assignment
-        SmallVec &operator=(const SmallVec &other) {
-            if (this != &other) {
-                if (m_using_heap) {
-                    m_heap.~vector();
-                }
-                m_size = other.m_size;
-                m_using_heap = other.m_using_heap;
-                if (m_using_heap) {
-                    new (&m_heap) std::vector<T>(other.m_heap);
-                } else {
-                    m_inline = other.m_inline;
-                }
-            }
-            return *this;
         }
 
         void push_back(const T &value) {
@@ -63,9 +31,9 @@ namespace graphix {
                     m_inline[m_size++] = value;
                 } else {
                     // Transition to heap
-                    std::vector<T> temp(m_inline.begin(), m_inline.begin() + N);
-                    temp.push_back(value);
-                    new (&m_heap) std::vector<T>(std::move(temp));
+                    m_heap.reserve(m_size + 1);
+                    m_heap.assign(m_inline.begin(), m_inline.begin() + m_size);
+                    m_heap.push_back(value);
                     m_using_heap = true;
                     m_size = m_heap.size();
                 }
@@ -81,10 +49,9 @@ namespace graphix {
         bool empty() const { return m_size == 0; }
 
         void clear() {
-            if (m_using_heap) {
-                m_heap.clear();
-            }
             m_size = 0;
+            m_using_heap = false;
+            m_heap.clear();
         }
 
         // Iterator support
@@ -97,13 +64,10 @@ namespace graphix {
         const T *end() const { return begin() + m_size; }
 
       private:
-        size_t m_size;
-        bool m_using_heap;
-
-        union {
-            std::array<T, N> m_inline;
-            std::vector<T> m_heap;
-        };
+        size_t m_size = 0;
+        bool m_using_heap = false;
+        std::array<T, N> m_inline{};
+        std::vector<T> m_heap;
     };
 
 } // namespace graphix

@@ -262,11 +262,26 @@ TEST_CASE("Vec3BetweenFactor - negative relative measurement") {
     Vec3BetweenFactor factor(X(0), X(1), measured, sigmas);
 
     Values values;
-    values.insert(X(0), Vec3d(5.0, 5.0, 5.0));
-    values.insert(X(1), Vec3d(4.0, 3.0, 2.0)); // vj - vi = (-1, -2, -3)
+    values.insert(X(0), Vec3d(5.0, 5.0, 0.0));
+    values.insert(X(1), Vec3d(4.0, 3.0, -3.0)); // local relative = (-1, -2, -3)
 
     double error = factor.error(values);
     CHECK(error == doctest::Approx(0.0));
+}
+
+TEST_CASE("Vec3BetweenFactor - translation is in local frame") {
+    // Pose i faces +Y (90 degrees). A 1m forward motion in local frame results in +Y in world.
+    Vec3d measured(1.0, 0.0, 0.0);
+    Vec3d sigmas(1.0, 1.0, 1.0);
+
+    Vec3BetweenFactor factor(X(0), X(1), measured, sigmas);
+
+    Values values;
+    values.insert(X(0), Vec3d(0.0, 0.0, M_PI / 2));
+    values.insert(X(1), Vec3d(0.0, 1.0, M_PI / 2));
+
+    double error = factor.error(values);
+    CHECK(error == doctest::Approx(0.0).epsilon(1e-6));
 }
 
 TEST_CASE("Vec3 factors - get keys from graph") {

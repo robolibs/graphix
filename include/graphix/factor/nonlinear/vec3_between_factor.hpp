@@ -10,7 +10,13 @@ namespace graphix::factor {
      * @brief Between factor for Vec3d variables
      *
      * Constrains the relative difference between two Vec3d variables.
-     * Error = 0.5 * sum(((vj - vi) - measured) / sigma[i])^2
+     *
+     * When interpreting Vec3d as a 2D pose (x, y, theta), the measured (dx, dy, dtheta)
+     * is treated as an odometry measurement in the *local frame of i*:
+     *   predicted_translation_local = R(-theta_i) * (t_j - t_i)
+     *   predicted_rotation = wrap(theta_j - theta_i)
+     *
+     * Error = 0.5 * sum(((predicted - measured) / sigma[i])^2
      *
      * Example uses:
      * - Odometry: Vec3d(dx, dy, dtheta) between poses
@@ -32,7 +38,7 @@ namespace graphix::factor {
         /**
          * @brief Compute error for this factor
          *
-         * Error = 0.5 * sum(((vj - vi - measured)[i] / sigma[i])^2)
+         * Error = 0.5 * sum(((predicted - measured)[i] / sigma[i])^2)
          *
          * @param values Current variable values
          * @return Squared Mahalanobis distance (weighted squared error)

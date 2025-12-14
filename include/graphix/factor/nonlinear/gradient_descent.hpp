@@ -3,7 +3,6 @@
 #include "graphix/factor/graph.hpp"
 #include "graphix/factor/nonlinear/nonlinear_factor.hpp"
 #include "graphix/factor/values.hpp"
-#include <unordered_map>
 
 namespace graphix::factor {
 
@@ -83,29 +82,6 @@ namespace graphix::factor {
          * @brief Compute total error of graph given values
          */
         double compute_error(const Graph<NonlinearFactor> &graph, const Values &values) const;
-
-        /**
-         * @brief Compute gradient for all variables using finite differences
-         *
-         * Uses central differences: df/dx ≈ (f(x+h) - f(x-h)) / (2h)
-         *
-         * @return Map from Key to gradient value
-         */
-        std::unordered_map<Key, double> compute_gradient(const Graph<NonlinearFactor> &graph,
-                                                         const Values &values) const;
-
-        /**
-         * @brief Compute L2 norm of gradient
-         */
-        double gradient_norm(const std::unordered_map<Key, double> &gradient) const;
-
-        /**
-         * @brief Update values by taking a gradient descent step
-         *
-         * x_new = x_old - step_size * gradient
-         */
-        Values update_values(const Values &current, const std::unordered_map<Key, double> &gradient,
-                             double step_size) const;
     };
 
 } // namespace graphix::factor

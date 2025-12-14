@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 #include <unordered_map>
 #include <variant>
 
@@ -51,9 +52,9 @@ namespace graphix::factor {
         std::unordered_map<Key, GradientValue> v; // Second moment (variance)
         int t = 0;                                // Time step
 
-        void update(Key key, const GradientValue &grad, double beta1, double beta2) {
-            t++;
+        void next_step() { ++t; }
 
+        void update(Key key, const GradientValue &grad, double beta1, double beta2) {
             if (std::holds_alternative<double>(grad)) {
                 double g = std::get<double>(grad);
 
@@ -97,6 +98,9 @@ namespace graphix::factor {
         }
 
         GradientValue get_corrected_update(Key key, double beta1, double beta2, double epsilon) const {
+            if (t <= 0) {
+                throw std::logic_error("AdamState::t must be >= 1 before computing corrected update");
+            }
             double bias_correction1 = 1.0 - std::pow(beta1, t);
             double bias_correction2 = 1.0 - std::pow(beta2, t);
 
@@ -251,38 +255,6 @@ namespace graphix::factor {
         return updated;
     }
 
-    std::unordered_map<Key, double> GradientDescentOptimizer::compute_gradient(const Graph<NonlinearFactor> &graph,
-                                                                               const Values &values) const {
-        // This function is kept for API compatibility but returns gradient norms
-        auto cache = compute_all_gradients(graph, values, params_.h);
-
-        std::unordered_map<Key, double> gradient_norms;
-        for (const auto &[key, grad_val] : cache.gradients) {
-            if (std::holds_alternative<double>(grad_val)) {
-                gradient_norms[key] = std::abs(std::get<double>(grad_val));
-            } else if (std::holds_alternative<Vec3d>(grad_val)) {
-                gradient_norms[key] = std::get<Vec3d>(grad_val).norm();
-            }
-        }
-
-        return gradient_norms;
-    }
-
-    double GradientDescentOptimizer::gradient_norm(const std::unordered_map<Key, double> &gradient) const {
-        double norm_squared = 0.0;
-        for (const auto &[key, grad] : gradient) {
-            norm_squared += grad * grad;
-        }
-        return std::sqrt(norm_squared);
-    }
-
-    Values GradientDescentOptimizer::update_values(const Values &current,
-                                                   const std::unordered_map<Key, double> &gradient,
-                                                   double step_size) const {
-        // This is a dummy implementation - the actual optimization uses apply_gradient_update
-        return current;
-    }
-
     GradientDescentOptimizer::Result GradientDescentOptimizer::optimize(const Graph<NonlinearFactor> &graph,
                                                                         const Values &initial) const {
 
@@ -324,6 +296,9 @@ namespace graphix::factor {
             // Update Adam state if using adaptive learning rate
             Values new_values;
             if (params_.use_adaptive_lr) {
+                // Advance the Adam time step once per iteration (not per parameter).
+                adam.next_step();
+
                 // Update Adam moments
                 for (const auto &[key, grad_val] : grad_cache.gradients) {
                     adam.update(key, grad_val, params_.adam_beta1, params_.adam_beta2);
