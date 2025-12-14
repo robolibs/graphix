@@ -737,3 +737,123 @@ TEST_CASE("Shortest path with varying weights") {
     CHECK(result.found);
     CHECK(result.distance == 3.0);
 }
+
+// ============================================================================
+// Step 6: Graph Modification
+// ============================================================================
+
+TEST_CASE("Clear graph") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    g.add_edge(v1, v2, 1.0);
+    g.add_edge(v2, v3, 2.0);
+
+    CHECK(g.vertex_count() == 3);
+    CHECK(g.edge_count() == 2);
+
+    g.clear();
+
+    CHECK(g.vertex_count() == 0);
+    CHECK(g.edge_count() == 0);
+}
+
+TEST_CASE("Remove edge by ID") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    auto e1 = g.add_edge(v1, v2, 1.0);
+    auto e2 = g.add_edge(v2, v3, 2.0);
+
+    CHECK(g.edge_count() == 2);
+    CHECK(g.has_edge(v1, v2));
+
+    g.remove_edge(e1);
+
+    CHECK(g.edge_count() == 1);
+    CHECK_FALSE(g.has_edge(v1, v2));
+    CHECK(g.has_edge(v2, v3));
+}
+
+TEST_CASE("Remove edge by vertices") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    g.add_edge(v1, v2, 1.0);
+    g.add_edge(v2, v3, 2.0);
+
+    CHECK(g.has_edge(v1, v2));
+
+    g.remove_edge(v1, v2);
+
+    CHECK_FALSE(g.has_edge(v1, v2));
+    CHECK(g.has_edge(v2, v3));
+    CHECK(g.edge_count() == 1);
+}
+
+TEST_CASE("Remove vertex") {
+    graphix::vertex::Graph<int> g;
+
+    auto v1 = g.add_vertex(10);
+    auto v2 = g.add_vertex(20);
+    auto v3 = g.add_vertex(30);
+
+    g.add_edge(v1, v2, 1.0);
+    g.add_edge(v2, v3, 2.0);
+    g.add_edge(v1, v3, 3.0);
+
+    CHECK(g.vertex_count() == 3);
+    CHECK(g.edge_count() == 3);
+
+    g.remove_vertex(v2);
+
+    CHECK(g.vertex_count() == 2);
+    CHECK_FALSE(g.has_vertex(v2));
+    CHECK(g.has_vertex(v1));
+    CHECK(g.has_vertex(v3));
+
+    // Edges involving v2 should be removed
+    CHECK_FALSE(g.has_edge(v1, v2));
+    CHECK_FALSE(g.has_edge(v2, v3));
+    // Edge between v1 and v3 should remain
+    CHECK(g.has_edge(v1, v3));
+    CHECK(g.edge_count() == 1);
+}
+
+TEST_CASE("Remove vertex with no edges") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+
+    CHECK(g.vertex_count() == 2);
+
+    g.remove_vertex(v1);
+
+    CHECK(g.vertex_count() == 1);
+    CHECK_FALSE(g.has_vertex(v1));
+    CHECK(g.has_vertex(v2));
+}
+
+TEST_CASE("Clear graph with properties") {
+    graphix::vertex::Graph<Point> g;
+
+    auto v1 = g.add_vertex(Point(1.0, 2.0));
+    auto v2 = g.add_vertex(Point(3.0, 4.0));
+
+    g.add_edge(v1, v2, 5.0);
+
+    g.clear();
+
+    CHECK(g.vertex_count() == 0);
+    CHECK(g.edge_count() == 0);
+}

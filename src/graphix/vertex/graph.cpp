@@ -1,4 +1,5 @@
 #include "graphix/vertex/graph.hpp"
+#include <algorithm>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -127,6 +128,70 @@ namespace graphix {
             }
 
             return result;
+        }
+
+        // Graph modification for void specialization
+        void Graph<void>::clear() {
+            m_vertices = Store<int>();
+            m_adjacency.clear();
+            m_next_edge_id = 0;
+            m_edge_count = 0;
+        }
+
+        void Graph<void>::remove_edge(graphix::vertex::EdgeId e) {
+            // Find and remove edges with this ID from both directions
+            for (auto &[vertex, edges] : m_adjacency) {
+                auto it = std::remove_if(edges.begin(), edges.end(), [e](const Edge &edge) { return edge.id == e; });
+                if (it != edges.end()) {
+                    edges.erase(it, edges.end());
+                }
+            }
+            m_edge_count--;
+        }
+
+        void Graph<void>::remove_edge(VertexId u, VertexId v) {
+            // Find edge ID first
+            auto it_u = m_adjacency.find(u);
+            if (it_u != m_adjacency.end()) {
+                for (const auto &edge : it_u->second) {
+                    if (edge.target == v) {
+                        remove_edge(edge.id);
+                        return;
+                    }
+                }
+            }
+        }
+
+        void Graph<void>::remove_vertex(VertexId v) {
+            if (!has_vertex(v)) {
+                return;
+            }
+
+            // Remove all edges incident to this vertex
+            auto it = m_adjacency.find(v);
+            if (it != m_adjacency.end()) {
+                // Remove edges from this vertex to others
+                std::vector<graphix::vertex::EdgeId> edges_to_remove;
+                for (const auto &edge : it->second) {
+                    edges_to_remove.push_back(edge.id);
+                }
+                m_adjacency.erase(it);
+
+                // Remove edges from other vertices to this one
+                for (auto edge_id : edges_to_remove) {
+                    for (auto &[vertex, edges] : m_adjacency) {
+                        auto edge_it = std::remove_if(edges.begin(), edges.end(),
+                                                      [edge_id](const Edge &e) { return e.id == edge_id; });
+                        if (edge_it != edges.end()) {
+                            edges.erase(edge_it, edges.end());
+                        }
+                    }
+                    m_edge_count--;
+                }
+            }
+
+            // Remove vertex from storage
+            m_vertices.remove(Id<int>(v));
         }
 
     } // namespace vertex
