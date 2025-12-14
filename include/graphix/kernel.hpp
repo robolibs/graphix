@@ -1,10 +1,78 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 namespace graphix {
 
-    // Stable key type for identifying variables/nodes
+    // ============================================================================
+    // Key: Stable identifier for variables/nodes (GTSAM-style)
+    // ============================================================================
+
     using Key = uint64_t;
 
+    // ============================================================================
+    // Symbol: Encode character + index into a Key (e.g., X(0), L(12))
+    // ============================================================================
+
+    class Symbol {
+      public:
+        Symbol() : m_key(0) {}
+        Symbol(unsigned char c, uint64_t j);
+
+        unsigned char chr() const;
+        uint64_t index() const;
+        Key key() const { return m_key; }
+
+        operator Key() const { return m_key; }
+
+        bool operator==(const Symbol &other) const { return m_key == other.m_key; }
+        bool operator!=(const Symbol &other) const { return m_key != other.m_key; }
+
+      private:
+        Key m_key;
+    };
+
+    // Helper functions for symbol creation
+    inline Symbol X(uint64_t j) { return Symbol('x', j); }
+    inline Symbol L(uint64_t j) { return Symbol('l', j); }
+    inline Symbol P(uint64_t j) { return Symbol('p', j); }
+
+    // ============================================================================
+    // Id<T>: Strong typed ID wrapper for stable handles
+    // ============================================================================
+
+    template <typename T> class Id {
+      public:
+        using value_type = uint32_t;
+
+        Id() : m_id(invalid_id()) {}
+        explicit Id(value_type id) : m_id(id) {}
+
+        value_type value() const { return m_id; }
+        bool is_valid() const { return m_id != invalid_id(); }
+
+        bool operator==(const Id &other) const { return m_id == other.m_id; }
+        bool operator!=(const Id &other) const { return m_id != other.m_id; }
+        bool operator<(const Id &other) const { return m_id < other.m_id; }
+
+        static constexpr value_type invalid_id() { return static_cast<value_type>(-1); }
+
+      private:
+        value_type m_id;
+    };
+
 } // namespace graphix
+
+// Hash support for Symbol and Id<T>
+namespace std {
+    template <> struct hash<graphix::Symbol> {
+        size_t operator()(const graphix::Symbol &s) const { return hash<graphix::Key>()(s.key()); }
+    };
+
+    template <typename T> struct hash<graphix::Id<T>> {
+        size_t operator()(const graphix::Id<T> &id) const {
+            return hash<typename graphix::Id<T>::value_type>()(id.value());
+        }
+    };
+} // namespace std

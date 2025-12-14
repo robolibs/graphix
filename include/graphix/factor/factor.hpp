@@ -1,21 +1,27 @@
 #pragma once
 
 #include "graphix/kernel.hpp"
-#include <vector>
+#include "graphix/smallvec.hpp"
+#include <initializer_list>
 
 namespace graphix {
     namespace factor {
 
+        // Default: most factors connect 1-6 variables
+        constexpr size_t DEFAULT_FACTOR_SIZE = 6;
+
         class Factor {
           public:
             Factor();
-            explicit Factor(const std::vector<Key> &keys);
+            explicit Factor(std::initializer_list<Key> keys);
 
-            const std::vector<Key> &keys() const;
+            const SmallVec<Key, DEFAULT_FACTOR_SIZE> &keys() const;
             size_t key_count() const;
 
+            void add_key(Key key);
+
           protected:
-            std::vector<Key> m_keys;
+            SmallVec<Key, DEFAULT_FACTOR_SIZE> m_keys;
         };
 
     } // namespace factor
