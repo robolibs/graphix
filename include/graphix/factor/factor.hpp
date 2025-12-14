@@ -3,22 +3,31 @@
 #include "graphix/kernel.hpp"
 #include "graphix/smallvec.hpp"
 #include <initializer_list>
+#include <vector>
 
 namespace graphix {
     namespace factor {
 
-        // Default: most factors connect 1-6 variables
         constexpr size_t DEFAULT_FACTOR_SIZE = 6;
 
+        // Factor base class: pure structure (which variables are connected)
+        // NO error computation here - that's in NonlinearFactor
         class Factor {
           public:
             Factor();
             explicit Factor(std::initializer_list<Key> keys);
 
-            const SmallVec<Key, DEFAULT_FACTOR_SIZE> &keys() const;
-            size_t key_count() const;
+            // Variadic constructor for convenience
+            template <typename... Keys> explicit Factor(Keys... keys) : m_keys{static_cast<Key>(keys)...} {}
 
-            void add_key(Key key);
+            virtual ~Factor() = default;
+
+            // Access keys
+            const SmallVec<Key, DEFAULT_FACTOR_SIZE> &keys() const;
+            size_t size() const;
+
+            // Check if factor involves a specific key
+            bool involves(Key key) const;
 
           protected:
             SmallVec<Key, DEFAULT_FACTOR_SIZE> m_keys;

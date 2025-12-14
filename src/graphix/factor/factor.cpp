@@ -1,4 +1,5 @@
 #include "graphix/factor/factor.hpp"
+#include <algorithm>
 
 namespace graphix {
     namespace factor {
@@ -9,9 +10,9 @@ namespace graphix {
 
         const SmallVec<Key, DEFAULT_FACTOR_SIZE> &Factor::keys() const { return m_keys; }
 
-        size_t Factor::key_count() const { return m_keys.size(); }
+        size_t Factor::size() const { return m_keys.size(); }
 
-        void Factor::add_key(Key key) { m_keys.push_back(key); }
+        bool Factor::involves(Key key) const { return std::find(m_keys.begin(), m_keys.end(), key) != m_keys.end(); }
 
     } // namespace factor
 } // namespace graphix

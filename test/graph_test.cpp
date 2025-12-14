@@ -15,5 +15,5 @@ TEST_CASE("Factor Graph exists") {
 
 TEST_CASE("Factor exists") {
     graphix::factor::Factor factor;
-    CHECK(factor.key_count() == 0);
+    CHECK(factor.size() == 0);
 }
