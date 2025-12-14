@@ -1,15 +1,17 @@
 /**
  * @file compare_optimizers.cpp
- * @brief Compare Gradient Descent vs Gauss-Newton on 2D SLAM
+ * @brief Compare Gradient Descent vs Gauss-Newton vs Levenberg-Marquardt on 2D SLAM
  *
- * This example compares two optimization methods on the same SLAM problem:
+ * This example compares three optimization methods on the same SLAM problem:
  * 1. Gradient Descent (first-order, many iterations)
- * 2. Gauss-Newton (second-order, few iterations)
+ * 2. Gauss-Newton (second-order, few iterations, less robust)
+ * 3. Levenberg-Marquardt (second-order, adaptive damping, most robust)
  */
 
 #include "graphix/factor/graph.hpp"
 #include "graphix/factor/nonlinear/gauss_newton.hpp"
 #include "graphix/factor/nonlinear/gradient_descent.hpp"
+#include "graphix/factor/nonlinear/levenberg_marquardt.hpp"
 #include "graphix/factor/nonlinear/vec3_between_factor.hpp"
 #include "graphix/factor/nonlinear/vec3_prior_factor.hpp"
 #include "graphix/kernel.hpp"
@@ -130,7 +132,43 @@ int main() {
     std::cout << std::endl;
 
     // ========================================
-    // 4. Comparison
+    // 4. Optimize with Levenberg-Marquardt
+    // ========================================
+
+    std::cout << "=== Levenberg-Marquardt ===" << std::endl;
+
+    LevenbergMarquardtOptimizer::Parameters lm_params;
+    lm_params.max_iterations = 100;
+    lm_params.tolerance = 1e-6;
+    lm_params.verbose = false;
+    lm_params.initial_lambda = 1e-3;
+    lm_params.lambda_factor = 10.0;
+
+    LevenbergMarquardtOptimizer lm_optimizer(lm_params);
+
+    auto lm_start = std::chrono::high_resolution_clock::now();
+    auto lm_result = lm_optimizer.optimize(graph, initial);
+    auto lm_end = std::chrono::high_resolution_clock::now();
+
+    auto lm_duration = std::chrono::duration_cast<std::chrono::microseconds>(lm_end - lm_start);
+
+    std::cout << "Iterations: " << lm_result.iterations << std::endl;
+    std::cout << "Converged: " << (lm_result.converged ? "yes" : "no") << std::endl;
+    std::cout << "Final error: " << std::fixed << std::setprecision(6) << lm_result.final_error << std::endl;
+    std::cout << "Time: " << lm_duration.count() / 1000.0 << " ms" << std::endl;
+    std::cout << std::endl;
+
+    // Check loop closure error for LM
+    Vec3d lm_final = lm_result.values.at<Vec3d>(X(4));
+    Vec3d lm_start_pose = lm_result.values.at<Vec3d>(X(0));
+    Vec3d lm_loop_error = lm_final - lm_start_pose;
+    double lm_loop_dist = std::sqrt(lm_loop_error.x() * lm_loop_error.x() + lm_loop_error.y() * lm_loop_error.y());
+    std::cout << "Loop closure error: " << std::fixed << std::setprecision(3) << lm_loop_dist * 1000 << " mm"
+              << std::endl;
+    std::cout << std::endl;
+
+    // ========================================
+    // 5. Comparison
     // ========================================
 
     std::cout << "=== Comparison ===" << std::endl;
@@ -142,7 +180,9 @@ int main() {
 
     double gd_time_ms = gd_duration.count() / 1000.0;
     double gn_time_ms = gn_duration.count() / 1000.0;
-    double speedup = gd_duration.count() / (double)gn_duration.count();
+    double lm_time_ms = lm_duration.count() / 1000.0;
+    double gn_speedup = gd_duration.count() / (double)gn_duration.count();
+    double lm_speedup = gd_duration.count() / (double)lm_duration.count();
 
     std::cout << std::setw(25) << "Gradient Descent" << std::setw(15) << gd_result.iterations << std::setw(15)
               << std::fixed << std::setprecision(3) << gd_time_ms << std::setw(15) << std::fixed << std::setprecision(6)
@@ -150,7 +190,12 @@ int main() {
 
     std::cout << std::setw(25) << "Gauss-Newton" << std::setw(15) << gn_result.iterations << std::setw(15) << std::fixed
               << std::setprecision(3) << gn_time_ms << std::setw(15) << std::fixed << std::setprecision(6)
-              << gn_result.final_error << std::setw(15) << std::fixed << std::setprecision(1) << speedup << "x"
+              << gn_result.final_error << std::setw(15) << std::fixed << std::setprecision(1) << gn_speedup << "x"
+              << std::endl;
+
+    std::cout << std::setw(25) << "Levenberg-Marquardt" << std::setw(15) << lm_result.iterations << std::setw(15)
+              << std::fixed << std::setprecision(3) << lm_time_ms << std::setw(15) << std::fixed << std::setprecision(6)
+              << lm_result.final_error << std::setw(15) << std::fixed << std::setprecision(1) << lm_speedup << "x"
               << std::endl;
 
     std::cout << std::endl;
@@ -158,9 +203,14 @@ int main() {
     std::cout << "=== Summary ===" << std::endl;
     std::cout << "✓ Gauss-Newton converges in " << (gd_result.iterations / gn_result.iterations) << "x fewer iterations"
               << std::endl;
-    std::cout << "✓ Gauss-Newton is " << std::fixed << std::setprecision(1) << speedup << "x faster" << std::endl;
-    std::cout << "✓ Both methods achieve similar final accuracy" << std::endl;
-    std::cout << "✓ Second-order methods (Gauss-Newton) >> first-order (gradient descent) for SLAM!" << std::endl;
+    std::cout << "✓ Levenberg-Marquardt converges in " << (gd_result.iterations / lm_result.iterations)
+              << "x fewer iterations" << std::endl;
+    std::cout << "✓ Gauss-Newton is " << std::fixed << std::setprecision(1) << gn_speedup
+              << "x faster than gradient descent" << std::endl;
+    std::cout << "✓ Levenberg-Marquardt is " << std::fixed << std::setprecision(1) << lm_speedup
+              << "x faster than gradient descent" << std::endl;
+    std::cout << "✓ All methods achieve similar final accuracy" << std::endl;
+    std::cout << "✓ LM offers best balance of speed and robustness for SLAM!" << std::endl;
 
     return 0;
 }
