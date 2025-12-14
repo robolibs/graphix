@@ -33,6 +33,10 @@ namespace graphix {
             void set_weight(EdgeId e, double weight);
             size_t edge_count() const;
 
+            // Adjacency and neighbor queries
+            std::vector<VertexId> neighbors(VertexId v) const;
+            size_t degree(VertexId v) const;
+
           private:
             struct Edge {
                 VertexId target;
@@ -66,6 +70,10 @@ namespace graphix {
             double get_weight(EdgeId e) const;
             void set_weight(EdgeId e, double weight);
             size_t edge_count() const;
+
+            // Adjacency and neighbor queries
+            std::vector<VertexId> neighbors(VertexId v) const;
+            size_t degree(VertexId v) const;
 
           private:
             struct Edge {
@@ -169,6 +177,28 @@ namespace graphix {
         }
 
         template <typename VertexProperty> size_t Graph<VertexProperty>::edge_count() const { return m_edge_count; }
+
+        // Adjacency and neighbor queries
+        template <typename VertexProperty>
+        std::vector<typename Graph<VertexProperty>::VertexId> Graph<VertexProperty>::neighbors(VertexId v) const {
+            std::vector<VertexId> result;
+            auto it = m_adjacency.find(v);
+            if (it != m_adjacency.end()) {
+                result.reserve(it->second.size());
+                for (const auto &edge : it->second) {
+                    result.push_back(edge.target);
+                }
+            }
+            return result;
+        }
+
+        template <typename VertexProperty> size_t Graph<VertexProperty>::degree(VertexId v) const {
+            auto it = m_adjacency.find(v);
+            if (it != m_adjacency.end()) {
+                return it->second.size();
+            }
+            return 0;
+        }
 
     } // namespace vertex
 } // namespace graphix

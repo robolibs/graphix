@@ -214,3 +214,160 @@ TEST_CASE("Edge count tracking") {
     g.add_edge(v1, v4);
     CHECK(g.edge_count() == 4);
 }
+
+// ============================================================================
+// Step 3: Adjacency and Neighbor Queries
+// ============================================================================
+
+TEST_CASE("Get neighbors of a vertex") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+    auto v4 = g.add_vertex();
+
+    g.add_edge(v1, v2);
+    g.add_edge(v1, v3);
+    g.add_edge(v1, v4);
+
+    auto neighbors = g.neighbors(v1);
+    CHECK(neighbors.size() == 3);
+
+    // Check all neighbors are present (order doesn't matter)
+    CHECK(std::find(neighbors.begin(), neighbors.end(), v2) != neighbors.end());
+    CHECK(std::find(neighbors.begin(), neighbors.end(), v3) != neighbors.end());
+    CHECK(std::find(neighbors.begin(), neighbors.end(), v4) != neighbors.end());
+}
+
+TEST_CASE("Neighbors on empty vertex") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+
+    // v1 has no edges
+    auto neighbors = g.neighbors(v1);
+    CHECK(neighbors.empty());
+}
+
+TEST_CASE("Neighbors with undirected edges") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    g.add_edge(v1, v2);
+    g.add_edge(v2, v3);
+
+    // v2 should be neighbor of v1
+    auto n1 = g.neighbors(v1);
+    CHECK(n1.size() == 1);
+    CHECK(n1[0] == v2);
+
+    // v1 and v3 should be neighbors of v2
+    auto n2 = g.neighbors(v2);
+    CHECK(n2.size() == 2);
+    CHECK(std::find(n2.begin(), n2.end(), v1) != n2.end());
+    CHECK(std::find(n2.begin(), n2.end(), v3) != n2.end());
+
+    // v2 should be neighbor of v3
+    auto n3 = g.neighbors(v3);
+    CHECK(n3.size() == 1);
+    CHECK(n3[0] == v2);
+}
+
+TEST_CASE("Vertex degree") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+    auto v4 = g.add_vertex();
+
+    // Initially all vertices have degree 0
+    CHECK(g.degree(v1) == 0);
+    CHECK(g.degree(v2) == 0);
+
+    // Add edges
+    g.add_edge(v1, v2);
+    CHECK(g.degree(v1) == 1);
+    CHECK(g.degree(v2) == 1);
+
+    g.add_edge(v1, v3);
+    CHECK(g.degree(v1) == 2);
+    CHECK(g.degree(v3) == 1);
+
+    g.add_edge(v1, v4);
+    CHECK(g.degree(v1) == 3); // v1 connected to v2, v3, v4
+    CHECK(g.degree(v4) == 1);
+
+    g.add_edge(v2, v3);
+    CHECK(g.degree(v2) == 2); // v2 connected to v1, v3
+    CHECK(g.degree(v3) == 2); // v3 connected to v1, v2
+}
+
+TEST_CASE("Neighbors with vertex properties") {
+    graphix::vertex::Graph<int> g;
+
+    auto v1 = g.add_vertex(100);
+    auto v2 = g.add_vertex(200);
+    auto v3 = g.add_vertex(300);
+
+    g.add_edge(v1, v2);
+    g.add_edge(v1, v3);
+
+    auto neighbors = g.neighbors(v1);
+    CHECK(neighbors.size() == 2);
+
+    // Verify we can still access properties
+    CHECK(g[v1] == 100);
+    CHECK(g[v2] == 200);
+}
+
+TEST_CASE("Degree with vertex properties") {
+    graphix::vertex::Graph<Point> g;
+
+    auto v1 = g.add_vertex(Point(1.0, 2.0));
+    auto v2 = g.add_vertex(Point(3.0, 4.0));
+    auto v3 = g.add_vertex(Point(5.0, 6.0));
+
+    CHECK(g.degree(v1) == 0);
+
+    g.add_edge(v1, v2, 1.5);
+    CHECK(g.degree(v1) == 1);
+    CHECK(g.degree(v2) == 1);
+
+    g.add_edge(v1, v3, 2.5);
+    CHECK(g.degree(v1) == 2);
+}
+
+TEST_CASE("Star graph topology") {
+    graphix::vertex::Graph<void> g;
+
+    auto center = g.add_vertex();
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+    auto v4 = g.add_vertex();
+
+    // Create star: center connected to all others
+    g.add_edge(center, v1);
+    g.add_edge(center, v2);
+    g.add_edge(center, v3);
+    g.add_edge(center, v4);
+
+    // Center has degree 4
+    CHECK(g.degree(center) == 4);
+
+    // All outer vertices have degree 1
+    CHECK(g.degree(v1) == 1);
+    CHECK(g.degree(v2) == 1);
+    CHECK(g.degree(v3) == 1);
+    CHECK(g.degree(v4) == 1);
+
+    // Center's neighbors are all outer vertices
+    auto neighbors = g.neighbors(center);
+    CHECK(neighbors.size() == 4);
+}

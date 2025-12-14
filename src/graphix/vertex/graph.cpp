@@ -76,5 +76,26 @@ namespace graphix {
 
         size_t Graph<void>::edge_count() const { return m_edge_count; }
 
+        // Adjacency and neighbor queries for void specialization
+        std::vector<Graph<void>::VertexId> Graph<void>::neighbors(VertexId v) const {
+            std::vector<VertexId> result;
+            auto it = m_adjacency.find(v);
+            if (it != m_adjacency.end()) {
+                result.reserve(it->second.size());
+                for (const auto &edge : it->second) {
+                    result.push_back(edge.target);
+                }
+            }
+            return result;
+        }
+
+        size_t Graph<void>::degree(VertexId v) const {
+            auto it = m_adjacency.find(v);
+            if (it != m_adjacency.end()) {
+                return it->second.size();
+            }
+            return 0;
+        }
+
     } // namespace vertex
 } // namespace graphix
