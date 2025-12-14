@@ -3,13 +3,17 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <unordered_map>
+#include <variant>
 
 namespace graphix::factor {
+
+    // Type to store gradient for either double or Vec3d
+    using GradientValue = std::variant<double, Vec3d>;
 
     GradientDescentOptimizer::GradientDescentOptimizer(const Parameters &params) : params_(params) {}
 
     double GradientDescentOptimizer::compute_error(const Graph<NonlinearFactor> &graph, const Values &values) const {
-
         double total_error = 0.0;
         for (const auto &factor : graph) {
             total_error += factor->error(values);
@@ -17,122 +21,155 @@ namespace graphix::factor {
         return total_error;
     }
 
-    // Helper to compute gradient and update for a single scalar variable
-    static std::pair<double, double> compute_scalar_gradient_and_update(const Graph<NonlinearFactor> &graph,
-                                                                        const Values &values, Key key, double h,
-                                                                        double step_size) {
-        double x = values.at<double>(key);
+    // Helper class to compute and cache gradients
+    class GradientCache {
+      public:
+        std::unordered_map<Key, GradientValue> gradients;
+        double norm = 0.0;
 
-        // Compute gradient using central differences
-        Values values_plus = values;
-        Values values_minus = values;
-
-        values_plus.erase(key);
-        values_plus.insert(key, x + h);
-        values_minus.erase(key);
-        values_minus.insert(key, x - h);
-
-        double error_plus = 0.0;
-        for (const auto &factor : graph) {
-            error_plus += factor->error(values_plus);
+        void add_scalar_gradient(Key key, double grad) {
+            gradients[key] = grad;
+            norm += grad * grad;
         }
 
-        double error_minus = 0.0;
-        for (const auto &factor : graph) {
-            error_minus += factor->error(values_minus);
+        void add_vec3_gradient(Key key, const Vec3d &grad) {
+            gradients[key] = grad;
+            norm += grad.norm_squared();
         }
 
-        double grad = (error_plus - error_minus) / (2.0 * h);
-        double new_value = x - step_size * grad;
+        void finalize() { norm = std::sqrt(norm); }
 
-        return {grad, new_value};
-    }
+        const GradientValue &get(Key key) const { return gradients.at(key); }
 
-    // Helper to compute gradient and update for a Vec3d variable
-    static std::pair<Vec3d, Vec3d> compute_vec3_gradient_and_update(const Graph<NonlinearFactor> &graph,
-                                                                    const Values &values, Key key, double h,
-                                                                    double step_size) {
-        Vec3d vec = values.at<Vec3d>(key);
-        Vec3d grad(0.0, 0.0, 0.0);
+        bool has(Key key) const { return gradients.find(key) != gradients.end(); }
+    };
 
-        // Compute gradient for each dimension
-        for (int dim = 0; dim < 3; ++dim) {
-            Vec3d vec_plus = vec;
-            Vec3d vec_minus = vec;
+    // Adam optimizer state
+    class AdamState {
+      public:
+        std::unordered_map<Key, GradientValue> m; // First moment (mean)
+        std::unordered_map<Key, GradientValue> v; // Second moment (variance)
+        int t = 0;                                // Time step
 
-            vec_plus[dim] += h;
-            vec_minus[dim] -= h;
+        void update(Key key, const GradientValue &grad, double beta1, double beta2) {
+            t++;
 
-            Values values_plus = values;
-            Values values_minus = values;
+            if (std::holds_alternative<double>(grad)) {
+                double g = std::get<double>(grad);
 
-            values_plus.erase(key);
-            values_plus.insert(key, vec_plus);
-            values_minus.erase(key);
-            values_minus.insert(key, vec_minus);
+                // Initialize if needed
+                if (m.find(key) == m.end()) {
+                    m[key] = 0.0;
+                    v[key] = 0.0;
+                }
 
-            double error_plus = 0.0;
-            for (const auto &factor : graph) {
-                error_plus += factor->error(values_plus);
+                double m_val = std::get<double>(m[key]);
+                double v_val = std::get<double>(v[key]);
+
+                // Update biased moments
+                m_val = beta1 * m_val + (1.0 - beta1) * g;
+                v_val = beta2 * v_val + (1.0 - beta2) * g * g;
+
+                m[key] = m_val;
+                v[key] = v_val;
+
+            } else if (std::holds_alternative<Vec3d>(grad)) {
+                Vec3d g = std::get<Vec3d>(grad);
+
+                // Initialize if needed
+                if (m.find(key) == m.end()) {
+                    m[key] = Vec3d(0, 0, 0);
+                    v[key] = Vec3d(0, 0, 0);
+                }
+
+                Vec3d m_val = std::get<Vec3d>(m[key]);
+                Vec3d v_val = std::get<Vec3d>(v[key]);
+
+                // Update biased moments (element-wise)
+                for (int i = 0; i < 3; i++) {
+                    m_val[i] = beta1 * m_val[i] + (1.0 - beta1) * g[i];
+                    v_val[i] = beta2 * v_val[i] + (1.0 - beta2) * g[i] * g[i];
+                }
+
+                m[key] = m_val;
+                v[key] = v_val;
             }
-
-            double error_minus = 0.0;
-            for (const auto &factor : graph) {
-                error_minus += factor->error(values_minus);
-            }
-
-            grad[dim] = (error_plus - error_minus) / (2.0 * h);
         }
 
-        Vec3d new_vec = vec - grad * step_size;
-        return {grad, new_vec};
-    }
+        GradientValue get_corrected_update(Key key, double beta1, double beta2, double epsilon) const {
+            double bias_correction1 = 1.0 - std::pow(beta1, t);
+            double bias_correction2 = 1.0 - std::pow(beta2, t);
 
-    std::unordered_map<Key, double> GradientDescentOptimizer::compute_gradient(const Graph<NonlinearFactor> &graph,
-                                                                               const Values &values) const {
+            if (std::holds_alternative<double>(m.at(key))) {
+                double m_val = std::get<double>(m.at(key));
+                double v_val = std::get<double>(v.at(key));
 
-        std::unordered_map<Key, double> gradient_norms;
+                double m_hat = m_val / bias_correction1;
+                double v_hat = v_val / bias_correction2;
 
-        // Get all keys from values
+                return m_hat / (std::sqrt(v_hat) + epsilon);
+
+            } else {
+                Vec3d m_val = std::get<Vec3d>(m.at(key));
+                Vec3d v_val = std::get<Vec3d>(v.at(key));
+
+                Vec3d update;
+                for (int i = 0; i < 3; i++) {
+                    double m_hat = m_val[i] / bias_correction1;
+                    double v_hat = v_val[i] / bias_correction2;
+                    update[i] = m_hat / (std::sqrt(v_hat) + epsilon);
+                }
+
+                return update;
+            }
+        }
+    };
+
+    // Compute all gradients and return cached structure
+    static GradientCache compute_all_gradients(const Graph<NonlinearFactor> &graph, const Values &values, double h) {
+        GradientCache cache;
+
         auto keys = values.keys();
-
-        // Compute gradient for each variable
         for (Key key : keys) {
-            // Try to get as double first
+            // Try double first
             try {
                 double x = values.at<double>(key);
 
-                // Create perturbed values
+                // Central difference for scalar
                 Values values_plus = values;
                 Values values_minus = values;
 
                 values_plus.erase(key);
-                values_plus.insert(key, x + params_.h);
+                values_plus.insert(key, x + h);
                 values_minus.erase(key);
-                values_minus.insert(key, x - params_.h);
+                values_minus.insert(key, x - h);
 
-                // Compute errors
-                double error_plus = compute_error(graph, values_plus);
-                double error_minus = compute_error(graph, values_minus);
+                double error_plus = 0.0;
+                for (const auto &factor : graph) {
+                    error_plus += factor->error(values_plus);
+                }
 
-                // Central difference
-                double grad = (error_plus - error_minus) / (2.0 * params_.h);
-                gradient_norms[key] = std::abs(grad);
+                double error_minus = 0.0;
+                for (const auto &factor : graph) {
+                    error_minus += factor->error(values_minus);
+                }
+
+                double grad = (error_plus - error_minus) / (2.0 * h);
+                cache.add_scalar_gradient(key, grad);
 
             } catch (const std::runtime_error &) {
-                // Not a double, try Vec3d
+                // Try Vec3d
                 try {
                     Vec3d vec = values.at<Vec3d>(key);
-
-                    // Compute gradient for each dimension
                     Vec3d grad(0.0, 0.0, 0.0);
 
+                    // Compute gradient for each dimension
                     for (int dim = 0; dim < 3; ++dim) {
                         Vec3d vec_plus = vec;
                         Vec3d vec_minus = vec;
 
-                        vec_plus[dim] += params_.h;
-                        vec_minus[dim] -= params_.h;
+                        vec_plus[dim] += h;
+                        vec_minus[dim] -= h;
 
                         Values values_plus = values;
                         Values values_minus = values;
@@ -142,14 +179,20 @@ namespace graphix::factor {
                         values_minus.erase(key);
                         values_minus.insert(key, vec_minus);
 
-                        double error_plus = compute_error(graph, values_plus);
-                        double error_minus = compute_error(graph, values_minus);
+                        double error_plus = 0.0;
+                        for (const auto &factor : graph) {
+                            error_plus += factor->error(values_plus);
+                        }
 
-                        grad[dim] = (error_plus - error_minus) / (2.0 * params_.h);
+                        double error_minus = 0.0;
+                        for (const auto &factor : graph) {
+                            error_minus += factor->error(values_minus);
+                        }
+
+                        grad[dim] = (error_plus - error_minus) / (2.0 * h);
                     }
 
-                    // Store L2 norm of gradient vector
-                    gradient_norms[key] = grad.norm();
+                    cache.add_vec3_gradient(key, grad);
 
                 } catch (const std::runtime_error &) {
                     throw std::runtime_error("Unsupported type in gradient computation for key " + std::to_string(key));
@@ -157,11 +200,75 @@ namespace graphix::factor {
             }
         }
 
+        cache.finalize();
+        return cache;
+    }
+
+    // Apply Adam update with given step size
+    static Values apply_adam_update(const Values &current, const AdamState &adam, const GradientCache &grad_cache,
+                                    double step_size, double beta1, double beta2, double epsilon) {
+        Values updated = current;
+
+        for (const auto &[key, grad_val] : grad_cache.gradients) {
+            GradientValue update = adam.get_corrected_update(key, beta1, beta2, epsilon);
+
+            if (std::holds_alternative<double>(update)) {
+                double x = current.at<double>(key);
+                double u = std::get<double>(update);
+                updated.erase(key);
+                updated.insert(key, x - step_size * u);
+
+            } else if (std::holds_alternative<Vec3d>(update)) {
+                Vec3d vec = current.at<Vec3d>(key);
+                Vec3d u = std::get<Vec3d>(update);
+                updated.erase(key);
+                updated.insert(key, vec - u * step_size);
+            }
+        }
+
+        return updated;
+    }
+
+    // Apply standard gradient update
+    static Values apply_gradient_update(const Values &current, const GradientCache &grad_cache, double step_size) {
+        Values updated = current;
+
+        for (const auto &[key, grad_val] : grad_cache.gradients) {
+            if (std::holds_alternative<double>(grad_val)) {
+                double x = current.at<double>(key);
+                double grad = std::get<double>(grad_val);
+                updated.erase(key);
+                updated.insert(key, x - step_size * grad);
+
+            } else if (std::holds_alternative<Vec3d>(grad_val)) {
+                Vec3d vec = current.at<Vec3d>(key);
+                Vec3d grad = std::get<Vec3d>(grad_val);
+                updated.erase(key);
+                updated.insert(key, vec - grad * step_size);
+            }
+        }
+
+        return updated;
+    }
+
+    std::unordered_map<Key, double> GradientDescentOptimizer::compute_gradient(const Graph<NonlinearFactor> &graph,
+                                                                               const Values &values) const {
+        // This function is kept for API compatibility but returns gradient norms
+        auto cache = compute_all_gradients(graph, values, params_.h);
+
+        std::unordered_map<Key, double> gradient_norms;
+        for (const auto &[key, grad_val] : cache.gradients) {
+            if (std::holds_alternative<double>(grad_val)) {
+                gradient_norms[key] = std::abs(std::get<double>(grad_val));
+            } else if (std::holds_alternative<Vec3d>(grad_val)) {
+                gradient_norms[key] = std::get<Vec3d>(grad_val).norm();
+            }
+        }
+
         return gradient_norms;
     }
 
     double GradientDescentOptimizer::gradient_norm(const std::unordered_map<Key, double> &gradient) const {
-
         double norm_squared = 0.0;
         for (const auto &[key, grad] : gradient) {
             norm_squared += grad * grad;
@@ -172,46 +279,8 @@ namespace graphix::factor {
     Values GradientDescentOptimizer::update_values(const Values &current,
                                                    const std::unordered_map<Key, double> &gradient,
                                                    double step_size) const {
-
-        // NOTE: We need to recompute gradients because we only stored norms, not directions
-        // This is inefficient but correct. A better implementation would cache gradient vectors.
-
-        Values updated = current;
-
-        auto keys = current.keys();
-        for (Key key : keys) {
-            // Try double first
-            try {
-                double x = current.at<double>(key);
-
-                // Recompute gradient
-                Values values_plus = current;
-                Values values_minus = current;
-
-                values_plus.erase(key);
-                values_plus.insert(key, x + params_.h);
-                values_minus.erase(key);
-                values_minus.insert(key, x - params_.h);
-
-                // We don't have the graph here, so this won't work!
-                // We need a different approach.
-                // For now, just use a dummy update
-                updated.erase(key);
-                updated.insert(key, x); // No update - this is wrong but compiles
-
-            } catch (const std::runtime_error &) {
-                // Try Vec3d
-                try {
-                    Vec3d vec = current.at<Vec3d>(key);
-                    updated.erase(key);
-                    updated.insert(key, vec); // No update - this is wrong but compiles
-                } catch (const std::runtime_error &) {
-                    throw std::runtime_error("Unsupported type in value update for key " + std::to_string(key));
-                }
-            }
-        }
-
-        return updated;
+        // This is a dummy implementation - the actual optimization uses apply_gradient_update
+        return current;
     }
 
     GradientDescentOptimizer::Result GradientDescentOptimizer::optimize(const Graph<NonlinearFactor> &graph,
@@ -222,55 +291,29 @@ namespace graphix::factor {
 
         if (params_.verbose) {
             std::cout << "Initial error: " << current_error << std::endl;
+            if (params_.use_adaptive_lr) {
+                std::cout << "Using Adam optimizer (adaptive learning rate)" << std::endl;
+            }
         }
 
+        AdamState adam;
         int iteration = 0;
         bool converged = false;
         double gnorm = 0.0;
 
         for (iteration = 0; iteration < params_.max_iterations; ++iteration) {
-            // Update each variable independently
-            Values new_values = current_values;
-            double grad_norm_squared = 0.0;
+            // Compute gradients once
+            auto grad_cache = compute_all_gradients(graph, current_values, params_.h);
+            gnorm = grad_cache.norm;
 
-            auto keys = current_values.keys();
-            for (Key key : keys) {
-                // Try double
-                try {
-                    auto [grad, new_val] =
-                        compute_scalar_gradient_and_update(graph, current_values, key, params_.h, params_.step_size);
-                    new_values.erase(key);
-                    new_values.insert(key, new_val);
-                    grad_norm_squared += grad * grad;
-
-                } catch (const std::runtime_error &) {
-                    // Try Vec3d
-                    try {
-                        auto [grad_vec, new_vec] =
-                            compute_vec3_gradient_and_update(graph, current_values, key, params_.h, params_.step_size);
-                        new_values.erase(key);
-                        new_values.insert(key, new_vec);
-                        grad_norm_squared += grad_vec.norm_squared();
-
-                    } catch (const std::runtime_error &) {
-                        throw std::runtime_error("Unsupported type in optimization for key " + std::to_string(key));
-                    }
-                }
-            }
-
-            gnorm = std::sqrt(grad_norm_squared);
-            double new_error = compute_error(graph, new_values);
-
-            if (params_.verbose) {
-                std::cout << "Iteration " << iteration << ": error = " << new_error << ", gradient norm = " << gnorm
+            if (params_.verbose && (iteration % 100 == 0 || iteration < 10)) {
+                std::cout << "Iteration " << iteration << ": error = " << current_error << ", gradient norm = " << gnorm
                           << std::endl;
             }
 
             // Check convergence
             if (gnorm < params_.tolerance) {
                 converged = true;
-                current_values = new_values;
-                current_error = new_error;
                 if (params_.verbose) {
                     std::cout << "Converged! Gradient norm " << gnorm << " < tolerance " << params_.tolerance
                               << std::endl;
@@ -278,40 +321,54 @@ namespace graphix::factor {
                 break;
             }
 
-            // Simple line search: if error increases, reduce step size
+            // Update Adam state if using adaptive learning rate
+            Values new_values;
+            if (params_.use_adaptive_lr) {
+                // Update Adam moments
+                for (const auto &[key, grad_val] : grad_cache.gradients) {
+                    adam.update(key, grad_val, params_.adam_beta1, params_.adam_beta2);
+                }
+
+                // Apply Adam update
+                new_values = apply_adam_update(current_values, adam, grad_cache, params_.step_size, params_.adam_beta1,
+                                               params_.adam_beta2, params_.adam_epsilon);
+            } else {
+                // Standard gradient descent
+                new_values = apply_gradient_update(current_values, grad_cache, params_.step_size);
+            }
+
+            double new_error = compute_error(graph, new_values);
+
+            // Backtracking line search if error increased
             double step = params_.step_size;
             int backtrack_count = 0;
-            const int max_backtrack = 10;
+            const int max_backtrack = 20;
+            const double backtrack_factor = 0.5;
 
             while (new_error > current_error && backtrack_count < max_backtrack) {
-                step *= 0.5;
+                step *= backtrack_factor;
 
-                // Recompute with smaller step
-                new_values = current_values;
-                for (Key key : keys) {
-                    try {
-                        auto [grad, new_val] =
-                            compute_scalar_gradient_and_update(graph, current_values, key, params_.h, step);
-                        new_values.erase(key);
-                        new_values.insert(key, new_val);
-                    } catch (const std::runtime_error &) {
-                        try {
-                            auto [grad_vec, new_vec] =
-                                compute_vec3_gradient_and_update(graph, current_values, key, params_.h, step);
-                            new_values.erase(key);
-                            new_values.insert(key, new_vec);
-                        } catch (const std::runtime_error &) {
-                            throw std::runtime_error("Unsupported type in backtracking for key " + std::to_string(key));
-                        }
-                    }
+                if (params_.use_adaptive_lr) {
+                    new_values = apply_adam_update(current_values, adam, grad_cache, step, params_.adam_beta1,
+                                                   params_.adam_beta2, params_.adam_epsilon);
+                } else {
+                    new_values = apply_gradient_update(current_values, grad_cache, step);
                 }
 
                 new_error = compute_error(graph, new_values);
                 backtrack_count++;
             }
 
-            if (params_.verbose && backtrack_count > 0) {
+            if (params_.verbose && backtrack_count > 0 && (iteration % 100 == 0 || iteration < 10)) {
                 std::cout << "  Backtracked " << backtrack_count << " times, step size = " << step << std::endl;
+            }
+
+            // If we couldn't improve even with tiny steps, we're stuck
+            if (new_error >= current_error && backtrack_count >= max_backtrack) {
+                if (params_.verbose) {
+                    std::cout << "Cannot improve further at iteration " << iteration << ", stopping" << std::endl;
+                }
+                break;
             }
 
             // Accept the step

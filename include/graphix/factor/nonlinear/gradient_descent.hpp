@@ -19,11 +19,16 @@ namespace graphix::factor {
          * @brief Configuration parameters for gradient descent
          */
         struct Parameters {
-            int max_iterations = 100; ///< Maximum number of iterations
-            double step_size = 0.01;  ///< Fixed step size for gradient descent
-            double tolerance = 1e-6;  ///< Convergence tolerance on gradient norm
-            double h = 1e-5;          ///< Step size for finite differences
-            bool verbose = false;     ///< Print iteration info
+            int max_iterations = 100;     ///< Maximum number of iterations
+            double step_size = 0.01;      ///< Initial step size for gradient descent
+            double tolerance = 1e-6;      ///< Convergence tolerance on gradient norm
+            double h = 1e-5;              ///< Step size for finite differences
+            bool verbose = false;         ///< Print iteration info
+            double momentum = 0.9;        ///< Momentum coefficient (0 = no momentum, 0.9 typical)
+            bool use_adaptive_lr = false; ///< Use adaptive learning rate (Adam-like)
+            double adam_beta1 = 0.9;      ///< First moment decay
+            double adam_beta2 = 0.999;    ///< Second moment decay
+            double adam_epsilon = 1e-8;   ///< Numerical stability
 
             Parameters() = default;
         };

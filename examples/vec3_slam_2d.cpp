@@ -130,58 +130,78 @@ int main() {
     std::cout << std::endl;
 
     // ========================================
-    // 3. Create initial values (odometry-only estimate)
+    // 3. Create initial values
     // ========================================
 
-    // Simulate odometry integration with bias
-    // This will accumulate drift and not close the loop perfectly
+    // Option A: Use ground truth with small noise (easier problem)
+    // Option B: Use odometry integration (realistic but harder)
+
+    bool use_ground_truth_init = false; // Toggle this
+
     Values initial;
-    initial.insert(X(0), gt_x0);
 
-    // Integrate odometry (forward kinematics with biased measurements)
-    Vec3d current_pose = gt_x0;
+    if (use_ground_truth_init) {
+        // Start very close to solution to test optimizer
+        std::cout << "Using ground truth with small noise as initial guess" << std::endl;
+        initial.insert(X(0), gt_x0 + Vec3d(0.05, 0.05, 0.01));
+        initial.insert(X(1), gt_x1 + Vec3d(-0.03, 0.04, -0.01));
+        initial.insert(X(2), gt_x2 + Vec3d(0.04, -0.02, 0.02));
+        initial.insert(X(3), gt_x3 + Vec3d(-0.02, 0.03, -0.01));
+        initial.insert(X(4), gt_x4 + Vec3d(0.03, -0.04, 0.01));
+        initial.insert(X(5), gt_x5 + Vec3d(-0.04, 0.02, -0.02));
+        initial.insert(X(6), gt_x6 + Vec3d(0.02, -0.03, 0.01));
+        initial.insert(X(7), gt_x7 + Vec3d(-0.01, 0.04, -0.01));
+        initial.insert(X(8), gt_x8 + Vec3d(0.03, -0.02, 0.02));
+    } else {
+        // Odometry integration (more realistic)
+        std::cout << "Using odometry integration as initial guess" << std::endl;
+        initial.insert(X(0), gt_x0);
 
-    // X0 → X1: Move forward in current direction
-    double dx1 = odom_0_1.x() * cos(current_pose.z());
-    double dy1 = odom_0_1.x() * sin(current_pose.z());
-    current_pose = Vec3d(current_pose.x() + dx1, current_pose.y() + dy1, current_pose.z());
-    initial.insert(X(1), current_pose);
+        // Integrate odometry (forward kinematics with biased measurements)
+        Vec3d current_pose = gt_x0;
 
-    // X1 → X2: Rotate
-    current_pose = Vec3d(current_pose.x(), current_pose.y(), current_pose.z() + odom_1_2.z());
-    initial.insert(X(2), current_pose);
+        // X0 → X1: Move forward in current direction
+        double dx1 = odom_0_1.x() * cos(current_pose.z());
+        double dy1 = odom_0_1.x() * sin(current_pose.z());
+        current_pose = Vec3d(current_pose.x() + dx1, current_pose.y() + dy1, current_pose.z());
+        initial.insert(X(1), current_pose);
 
-    // X2 → X3: Move forward
-    double dx3 = odom_2_3.x() * cos(current_pose.z());
-    double dy3 = odom_2_3.x() * sin(current_pose.z());
-    current_pose = Vec3d(current_pose.x() + dx3, current_pose.y() + dy3, current_pose.z());
-    initial.insert(X(3), current_pose);
+        // X1 → X2: Rotate
+        current_pose = Vec3d(current_pose.x(), current_pose.y(), current_pose.z() + odom_1_2.z());
+        initial.insert(X(2), current_pose);
 
-    // X3 → X4: Rotate
-    current_pose = Vec3d(current_pose.x(), current_pose.y(), current_pose.z() + odom_3_4.z());
-    initial.insert(X(4), current_pose);
+        // X2 → X3: Move forward
+        double dx3 = odom_2_3.x() * cos(current_pose.z());
+        double dy3 = odom_2_3.x() * sin(current_pose.z());
+        current_pose = Vec3d(current_pose.x() + dx3, current_pose.y() + dy3, current_pose.z());
+        initial.insert(X(3), current_pose);
 
-    // X4 → X5: Move forward
-    double dx5 = odom_4_5.x() * cos(current_pose.z());
-    double dy5 = odom_4_5.x() * sin(current_pose.z());
-    current_pose = Vec3d(current_pose.x() + dx5, current_pose.y() + dy5, current_pose.z());
-    initial.insert(X(5), current_pose);
+        // X3 → X4: Rotate
+        current_pose = Vec3d(current_pose.x(), current_pose.y(), current_pose.z() + odom_3_4.z());
+        initial.insert(X(4), current_pose);
 
-    // X5 → X6: Rotate
-    current_pose = Vec3d(current_pose.x(), current_pose.y(), current_pose.z() + odom_5_6.z());
-    initial.insert(X(6), current_pose);
+        // X4 → X5: Move forward
+        double dx5 = odom_4_5.x() * cos(current_pose.z());
+        double dy5 = odom_4_5.x() * sin(current_pose.z());
+        current_pose = Vec3d(current_pose.x() + dx5, current_pose.y() + dy5, current_pose.z());
+        initial.insert(X(5), current_pose);
 
-    // X6 → X7: Move forward
-    double dx7 = odom_6_7.x() * cos(current_pose.z());
-    double dy7 = odom_6_7.x() * sin(current_pose.z());
-    current_pose = Vec3d(current_pose.x() + dx7, current_pose.y() + dy7, current_pose.z());
-    initial.insert(X(7), current_pose);
+        // X5 → X6: Rotate
+        current_pose = Vec3d(current_pose.x(), current_pose.y(), current_pose.z() + odom_5_6.z());
+        initial.insert(X(6), current_pose);
 
-    // X7 → X8: Rotate
-    current_pose = Vec3d(current_pose.x(), current_pose.y(), current_pose.z() + odom_7_8.z());
-    initial.insert(X(8), current_pose);
+        // X6 → X7: Move forward
+        double dx7 = odom_6_7.x() * cos(current_pose.z());
+        double dy7 = odom_6_7.x() * sin(current_pose.z());
+        current_pose = Vec3d(current_pose.x() + dx7, current_pose.y() + dy7, current_pose.z());
+        initial.insert(X(7), current_pose);
 
-    std::cout << "Initial Estimate (odometry-only, with drift):" << std::endl;
+        // X7 → X8: Rotate
+        current_pose = Vec3d(current_pose.x(), current_pose.y(), current_pose.z() + odom_7_8.z());
+        initial.insert(X(8), current_pose);
+    }
+
+    std::cout << "\nInitial Estimate:" << std::endl;
     for (size_t i = 0; i < 9; i++) {
         Vec3d pose = initial.at<Vec3d>(X(i));
         print_pose("X" + std::to_string(i), pose);
@@ -204,10 +224,11 @@ int main() {
 
     // Configure optimizer
     GradientDescentOptimizer::Parameters params;
-    params.max_iterations = 500; // More iterations for complex problem
-    params.step_size = 0.001;    // Smaller step size for stability
-    params.tolerance = 1e-4;     // Relaxed tolerance
-    params.verbose = false;      // Set to true to see iteration details
+    params.max_iterations = 10000; // LOTS of iterations for gradient descent
+    params.step_size = 0.01;       // Moderate step size
+    params.tolerance = 1e-3;       // Relaxed tolerance
+    params.use_adaptive_lr = true; // Use Adam optimizer (better than plain GD)
+    params.verbose = false;        // Set to true to see iteration details
 
     GradientDescentOptimizer optimizer(params);
     auto result_no_loop = optimizer.optimize(graph, initial);
