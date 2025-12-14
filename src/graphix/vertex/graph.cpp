@@ -17,7 +17,7 @@ namespace graphix {
         bool Graph<void>::has_vertex(VertexId v) const { return m_vertices.contains(Id<int>(v)); }
 
         // Edge operations for void specialization
-        graphix::vertex::EdgeId Graph<void>::add_edge(VertexId u, VertexId v, double weight) {
+        graphix::vertex::EdgeId Graph<void>::add_edge(VertexId u, VertexId v, double weight, EdgeType type) {
             // Verify both vertices exist
             if (!has_vertex(u) || !has_vertex(v)) {
                 throw std::invalid_argument("Cannot add edge: one or both vertices do not exist");
@@ -26,10 +26,12 @@ namespace graphix {
             graphix::vertex::EdgeId edge_id = m_next_edge_id++;
 
             // Add edge u -> v
-            m_adjacency[u].push_back({u, v, weight, edge_id});
+            m_adjacency[u].push_back({u, v, weight, edge_id, type});
 
-            // Add edge v -> u (undirected graph)
-            m_adjacency[v].push_back({v, u, weight, edge_id});
+            // For undirected edges, also add v -> u
+            if (type == EdgeType::Undirected) {
+                m_adjacency[v].push_back({v, u, weight, edge_id, type});
+            }
 
             m_edge_count++;
             return edge_id;
@@ -185,9 +187,9 @@ namespace graphix {
 
             for (const auto &[source, edge_list] : m_adjacency) {
                 for (const auto &edge : edge_list) {
-                    // Only add each edge once (undirected graph stores each edge twice)
+                    // Only add each edge once (undirected edges are stored twice, directed only once)
                     if (seen.find(edge.id) == seen.end()) {
-                        result.push_back({source, edge.target, edge.weight, edge.id});
+                        result.push_back({source, edge.target, edge.weight, edge.id, edge.type});
                         seen.insert(edge.id);
                     }
                 }
