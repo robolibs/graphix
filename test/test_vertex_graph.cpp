@@ -371,3 +371,179 @@ TEST_CASE("Star graph topology") {
     auto neighbors = g.neighbors(center);
     CHECK(neighbors.size() == 4);
 }
+
+// ============================================================================
+// Step 4: Iterators
+// ============================================================================
+
+TEST_CASE("Iterate over vertices without properties") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    auto vertices = g.vertices();
+    CHECK(vertices.size() == 3);
+
+    // Check all vertices are present
+    CHECK(std::find(vertices.begin(), vertices.end(), v1) != vertices.end());
+    CHECK(std::find(vertices.begin(), vertices.end(), v2) != vertices.end());
+    CHECK(std::find(vertices.begin(), vertices.end(), v3) != vertices.end());
+}
+
+TEST_CASE("Iterate over vertices with properties") {
+    graphix::vertex::Graph<int> g;
+
+    auto v1 = g.add_vertex(100);
+    auto v2 = g.add_vertex(200);
+    auto v3 = g.add_vertex(300);
+
+    auto vertices = g.vertices();
+    CHECK(vertices.size() == 3);
+
+    // Can access properties while iterating
+    int sum = 0;
+    for (auto v : vertices) {
+        sum += g[v];
+    }
+    CHECK(sum == 600);
+}
+
+TEST_CASE("Iterate over empty graph") {
+    graphix::vertex::Graph<void> g;
+
+    auto vertices = g.vertices();
+    CHECK(vertices.empty());
+
+    auto edges = g.edges();
+    CHECK(edges.empty());
+}
+
+TEST_CASE("Iterate over edges") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    auto e1 = g.add_edge(v1, v2, 1.5);
+    auto e2 = g.add_edge(v2, v3, 2.5);
+    auto e3 = g.add_edge(v1, v3, 3.5);
+
+    auto edges = g.edges();
+    CHECK(edges.size() == 3);
+
+    // Verify edge data
+    bool found_e1 = false, found_e2 = false, found_e3 = false;
+
+    for (const auto &edge : edges) {
+        if (edge.id == e1) {
+            CHECK(edge.weight == 1.5);
+            CHECK(((edge.source == v1 && edge.target == v2) || (edge.source == v2 && edge.target == v1)));
+            found_e1 = true;
+        } else if (edge.id == e2) {
+            CHECK(edge.weight == 2.5);
+            CHECK(((edge.source == v2 && edge.target == v3) || (edge.source == v3 && edge.target == v2)));
+            found_e2 = true;
+        } else if (edge.id == e3) {
+            CHECK(edge.weight == 3.5);
+            CHECK(((edge.source == v1 && edge.target == v3) || (edge.source == v3 && edge.target == v1)));
+            found_e3 = true;
+        }
+    }
+
+    CHECK(found_e1);
+    CHECK(found_e2);
+    CHECK(found_e3);
+}
+
+TEST_CASE("Edge iteration avoids duplicates") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+    auto v4 = g.add_vertex();
+
+    g.add_edge(v1, v2);
+    g.add_edge(v2, v3);
+    g.add_edge(v3, v4);
+    g.add_edge(v4, v1);
+
+    auto edges = g.edges();
+
+    // Should have exactly 4 edges, not 8 (undirected graph stores each edge twice internally)
+    CHECK(edges.size() == 4);
+    CHECK(g.edge_count() == 4);
+}
+
+TEST_CASE("Iterate and compute total weight") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    g.add_edge(v1, v2, 1.0);
+    g.add_edge(v2, v3, 2.0);
+    g.add_edge(v1, v3, 3.0);
+
+    auto edges = g.edges();
+    double total_weight = 0.0;
+    for (const auto &edge : edges) {
+        total_weight += edge.weight;
+    }
+
+    CHECK(total_weight == 6.0);
+}
+
+TEST_CASE("Range-based for loop over vertices") {
+    graphix::vertex::Graph<int> g;
+
+    g.add_vertex(10);
+    g.add_vertex(20);
+    g.add_vertex(30);
+
+    int count = 0;
+    for (auto v : g.vertices()) {
+        CHECK(g.has_vertex(v));
+        count++;
+    }
+    CHECK(count == 3);
+}
+
+TEST_CASE("Range-based for loop over edges") {
+    graphix::vertex::Graph<void> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+    auto v3 = g.add_vertex();
+
+    g.add_edge(v1, v2, 1.0);
+    g.add_edge(v2, v3, 2.0);
+
+    int count = 0;
+    for (const auto &edge : g.edges()) {
+        CHECK(edge.weight > 0.0);
+        count++;
+    }
+    CHECK(count == 2);
+}
+
+TEST_CASE("Vertices iteration with Point properties") {
+    graphix::vertex::Graph<Point> g;
+
+    auto v1 = g.add_vertex(Point(1.0, 2.0));
+    auto v2 = g.add_vertex(Point(3.0, 4.0));
+    auto v3 = g.add_vertex(Point(5.0, 6.0));
+
+    auto vertices = g.vertices();
+    CHECK(vertices.size() == 3);
+
+    // Verify properties are accessible
+    for (auto v : vertices) {
+        CHECK(g[v].x > 0.0);
+        CHECK(g[v].y > 0.0);
+    }
+}

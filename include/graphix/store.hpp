@@ -60,6 +60,18 @@ namespace graphix {
 
         bool empty() const { return size() == 0; }
 
+        // Get all valid IDs
+        std::vector<typename Id<T>::value_type> all_ids() const {
+            std::vector<typename Id<T>::value_type> result;
+            result.reserve(size());
+            for (typename Id<T>::value_type i = 0; i < m_data.size(); ++i) {
+                if (contains(Id<T>(i))) {
+                    result.push_back(i);
+                }
+            }
+            return result;
+        }
+
       private:
         std::vector<T> m_data;
         std::vector<typename Id<T>::value_type> m_free_list;

@@ -4,12 +4,21 @@
 #include "graphix/store.hpp"
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace graphix {
     namespace vertex {
 
         using EdgeId = size_t;
+
+        // Edge descriptor for iteration
+        struct EdgeDescriptor {
+            size_t source;
+            size_t target;
+            double weight;
+            EdgeId id;
+        };
 
         // Forward declaration for void specialization
         template <typename VertexProperty = void> class Graph;
@@ -36,6 +45,10 @@ namespace graphix {
             // Adjacency and neighbor queries
             std::vector<VertexId> neighbors(VertexId v) const;
             size_t degree(VertexId v) const;
+
+            // Iterators
+            std::vector<VertexId> vertices() const;
+            std::vector<EdgeDescriptor> edges() const;
 
           private:
             struct Edge {
@@ -74,6 +87,10 @@ namespace graphix {
             // Adjacency and neighbor queries
             std::vector<VertexId> neighbors(VertexId v) const;
             size_t degree(VertexId v) const;
+
+            // Iterators
+            std::vector<VertexId> vertices() const;
+            std::vector<EdgeDescriptor> edges() const;
 
           private:
             struct Edge {
@@ -198,6 +215,38 @@ namespace graphix {
                 return it->second.size();
             }
             return 0;
+        }
+
+        // Iterators
+        template <typename VertexProperty>
+        std::vector<typename Graph<VertexProperty>::VertexId> Graph<VertexProperty>::vertices() const {
+            auto ids = m_vertices.all_ids();
+            std::vector<VertexId> result;
+            result.reserve(ids.size());
+            for (auto id : ids) {
+                result.push_back(static_cast<VertexId>(id));
+            }
+            return result;
+        }
+
+        template <typename VertexProperty> std::vector<EdgeDescriptor> Graph<VertexProperty>::edges() const {
+            std::vector<EdgeDescriptor> result;
+            result.reserve(m_edge_count);
+
+            // Use a set to track edges we've already added (to avoid duplicates in undirected graph)
+            std::unordered_set<EdgeId> seen;
+
+            for (const auto &[source, edge_list] : m_adjacency) {
+                for (const auto &edge : edge_list) {
+                    // Only add each edge once (undirected graph stores each edge twice)
+                    if (seen.find(edge.id) == seen.end()) {
+                        result.push_back({source, edge.target, edge.weight, edge.id});
+                        seen.insert(edge.id);
+                    }
+                }
+            }
+
+            return result;
         }
 
     } // namespace vertex

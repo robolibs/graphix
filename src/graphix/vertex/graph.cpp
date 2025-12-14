@@ -1,5 +1,6 @@
 #include "graphix/vertex/graph.hpp"
 #include <stdexcept>
+#include <unordered_set>
 
 namespace graphix {
     namespace vertex {
@@ -95,6 +96,37 @@ namespace graphix {
                 return it->second.size();
             }
             return 0;
+        }
+
+        // Iterators for void specialization
+        std::vector<Graph<void>::VertexId> Graph<void>::vertices() const {
+            auto ids = m_vertices.all_ids();
+            std::vector<VertexId> result;
+            result.reserve(ids.size());
+            for (auto id : ids) {
+                result.push_back(static_cast<VertexId>(id));
+            }
+            return result;
+        }
+
+        std::vector<EdgeDescriptor> Graph<void>::edges() const {
+            std::vector<EdgeDescriptor> result;
+            result.reserve(m_edge_count);
+
+            // Use a set to track edges we've already added (to avoid duplicates in undirected graph)
+            std::unordered_set<graphix::vertex::EdgeId> seen;
+
+            for (const auto &[source, edge_list] : m_adjacency) {
+                for (const auto &edge : edge_list) {
+                    // Only add each edge once (undirected graph stores each edge twice)
+                    if (seen.find(edge.id) == seen.end()) {
+                        result.push_back({source, edge.target, edge.weight, edge.id});
+                        seen.insert(edge.id);
+                    }
+                }
+            }
+
+            return result;
         }
 
     } // namespace vertex
