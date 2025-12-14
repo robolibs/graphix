@@ -39,6 +39,10 @@ namespace graphix {
             using VertexId = Key;
 
             Graph() = default;
+            Graph(const Graph &other) = default;
+            Graph(Graph &&other) = default;
+            Graph &operator=(const Graph &other) = default;
+            Graph &operator=(Graph &&other) = default;
 
             // Vertex operations
             VertexId add_vertex();
@@ -93,6 +97,10 @@ namespace graphix {
             using VertexId = Key;
 
             Graph() = default;
+            Graph(const Graph &other) = default;
+            Graph(Graph &&other) = default;
+            Graph &operator=(const Graph &other) = default;
+            Graph &operator=(Graph &&other) = default;
 
             // Vertex operations
             VertexId add_vertex(const VertexProperty &prop);
