@@ -13,6 +13,9 @@ add_cxxflags("-Wall", "-Wextra", "-Wpedantic")
 add_cxxflags("-Wno-reorder", "-Wno-narrowing", "-Wno-array-bounds")
 add_cxxflags("-Wno-unused-variable", "-Wno-unused-parameter", "-Wno-stringop-overflow", "-Wno-unused-but-set-variable")
 
+-- SIMD flags for optinum (AVX2 for modern x86_64)
+add_cxxflags("-mavx2", "-mfma")
+
 -- Add global search paths for packages in ~/.local
 local home = os.getenv("HOME")
 if home then
@@ -97,15 +100,71 @@ package("rerun_sdk")
     end)
 package_end()
 
+-- Mandatory datapod dependency. Prefer local checkout at ../datapod, otherwise fetch from git.
+local dp_dir = path.join(os.projectdir(), "..", "datapod")
+local dp_source_dir = os.isdir(dp_dir) and dp_dir or path.join(os.projectdir(), "build/_deps/datapod-src")
+
+package("datapod")
+    set_sourcedir(dp_source_dir)
+
+    on_fetch(function (package)
+        local sourcedir = package:sourcedir()
+        if sourcedir == dp_dir then
+            return
+        end
+        if not os.isdir(sourcedir) then
+            print("Fetching datapod from git...")
+            os.mkdir(path.directory(sourcedir))
+            os.execv("git", {"clone", "--quiet", "--depth", "1", "--branch", "0.0.13",
+                            "-c", "advice.detachedHead=false",
+                            "https://github.com/robolibs/datapod.git", sourcedir})
+        end
+    end)
+
+    on_install(function (package)
+        local configs = {}
+        table.insert(configs, "-DCMAKE_BUILD_TYPE=" .. (package:is_debug() and "Debug" or "Release"))
+        import("package.tools.cmake").install(package, configs, {cmake_generator = "Unix Makefiles"})
+    end)
+package_end()
+
+add_requires("datapod")
+
+-- Mandatory optinum dependency. Prefer local checkout at ../optinum, otherwise fetch from git.
+local op_dir = path.join(os.projectdir(), "..", "optinum")
+local op_source_dir = os.isdir(op_dir) and op_dir or path.join(os.projectdir(), "build/_deps/optinum-src")
+
+package("optinum")
+    set_sourcedir(op_source_dir)
+
+    on_fetch(function (package)
+        local sourcedir = package:sourcedir()
+        if sourcedir == op_dir then
+            return
+        end
+        if not os.isdir(sourcedir) then
+            print("Fetching optinum from git...")
+            os.mkdir(path.directory(sourcedir))
+            os.execv("git", {"clone", "--quiet", "--depth", "1", "--branch", "0.0.4",
+                            "-c", "advice.detachedHead=false",
+                            "https://github.com/robolibs/optinum.git", sourcedir})
+        end
+    end)
+
+    on_install(function (package)
+        local configs = {}
+        table.insert(configs, "-DCMAKE_BUILD_TYPE=" .. (package:is_debug() and "Debug" or "Release"))
+        import("package.tools.cmake").install(package, configs, {cmake_generator = "Unix Makefiles"})
+    end)
+package_end()
+
+add_requires("optinum")
+
 -- Add required packages conditionally
 if has_config("examples") then
     add_requires("rerun_sdk")
 elseif has_config("rerun") then
     add_requires("rerun_sdk")
-end
-
-if has_config("tests") then
-    add_requires("doctest")
 end
 
 -- Main library target
@@ -118,6 +177,10 @@ target("graphix")
     -- Add header files
     add_headerfiles("include/(graphix/**.hpp)")
     add_includedirs("include", {public = true})
+
+    add_packages("datapod", {public = true})
+    add_packages("optinum", {public = true})
+    add_defines("SHORT_NAMESPACE", {public = true})
 
     -- Conditional rerun support (only if package is found)
     if has_config("examples") or has_config("rerun") then
@@ -157,6 +220,10 @@ if has_config("examples") and os.projectdir() == os.curdir() then
             add_includedirs("include")
         target_end()
     end
+end
+
+if has_config("tests") then
+    add_requires("doctest")
 end
 
 -- Tests (only build when graphix is the main project)

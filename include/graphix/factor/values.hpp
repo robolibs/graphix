@@ -35,8 +35,21 @@ namespace graphix {
           public:
             Values() = default;
 
-            Values(const Values &other);
-            Values &operator=(const Values &other);
+            inline Values(const Values &other) {
+                for (const auto &[key, value_ptr] : other.m_values) {
+                    m_values[key] = std::unique_ptr<Value>(value_ptr->clone());
+                }
+            }
+
+            inline Values &operator=(const Values &other) {
+                if (this != &other) {
+                    m_values.clear();
+                    for (const auto &[key, value_ptr] : other.m_values) {
+                        m_values[key] = std::unique_ptr<Value>(value_ptr->clone());
+                    }
+                }
+                return *this;
+            }
 
             Values(Values &&) = default;
             Values &operator=(Values &&) = default;
@@ -66,14 +79,21 @@ namespace graphix {
                 return generic_value->value();
             }
 
-            bool exists(Key key) const;
-            size_t size() const;
-            bool empty() const;
-            void erase(Key key);
-            void clear();
+            inline bool exists(Key key) const { return m_values.find(key) != m_values.end(); }
+            inline size_t size() const { return m_values.size(); }
+            inline bool empty() const { return m_values.empty(); }
+            inline void erase(Key key) { m_values.erase(key); }
+            inline void clear() { m_values.clear(); }
 
             // Get all keys
-            std::vector<Key> keys() const;
+            inline std::vector<Key> keys() const {
+                std::vector<Key> result;
+                result.reserve(m_values.size());
+                for (const auto &[key, _] : m_values) {
+                    result.push_back(key);
+                }
+                return result;
+            }
 
             // Iterator support for range-based loops
             using const_iterator = std::map<Key, std::unique_ptr<Value>>::const_iterator;

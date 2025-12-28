@@ -2,6 +2,7 @@
 
 #include "graphix/kernel.hpp"
 #include "graphix/smallvec.hpp"
+#include <algorithm>
 #include <initializer_list>
 #include <vector>
 
@@ -14,8 +15,8 @@ namespace graphix {
         // NO error computation here - that's in NonlinearFactor
         class Factor {
           public:
-            Factor();
-            explicit Factor(std::initializer_list<Key> keys);
+            inline Factor() = default;
+            inline explicit Factor(std::initializer_list<Key> keys) : m_keys(keys) {}
 
             // Variadic constructor for convenience
             template <typename... Keys> explicit Factor(Keys... keys) : m_keys{static_cast<Key>(keys)...} {}
@@ -23,11 +24,11 @@ namespace graphix {
             virtual ~Factor() = default;
 
             // Access keys
-            const SmallVec<Key, DEFAULT_FACTOR_SIZE> &keys() const;
-            size_t size() const;
+            inline const SmallVec<Key, DEFAULT_FACTOR_SIZE> &keys() const { return m_keys; }
+            inline size_t size() const { return m_keys.size(); }
 
             // Check if factor involves a specific key
-            bool involves(Key key) const;
+            inline bool involves(Key key) const { return std::find(m_keys.begin(), m_keys.end(), key) != m_keys.end(); }
 
           protected:
             SmallVec<Key, DEFAULT_FACTOR_SIZE> m_keys;

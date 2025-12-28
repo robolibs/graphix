@@ -18,10 +18,13 @@ namespace graphix {
     class Symbol {
       public:
         Symbol() : m_key(0) {}
-        Symbol(unsigned char c, uint64_t j);
+        inline Symbol(unsigned char c, uint64_t j) {
+            // GTSAM-style encoding: chr in upper bits, index in lower bits
+            m_key = (static_cast<uint64_t>(c) << 56) | (j & 0x00FFFFFFFFFFFFFF);
+        }
 
-        unsigned char chr() const;
-        uint64_t index() const;
+        inline unsigned char chr() const { return static_cast<unsigned char>(m_key >> 56); }
+        inline uint64_t index() const { return m_key & 0x00FFFFFFFFFFFFFF; }
         Key key() const { return m_key; }
 
         operator Key() const { return m_key; }

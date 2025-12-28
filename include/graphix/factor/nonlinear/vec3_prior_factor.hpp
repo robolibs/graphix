@@ -26,7 +26,14 @@ namespace graphix::factor {
          * @param prior Prior value (mean)
          * @param sigmas Standard deviations for each dimension
          */
-        Vec3PriorFactor(Key key, const Vec3d &prior, const Vec3d &sigmas);
+        inline Vec3PriorFactor(Key key, const Vec3d &prior, const Vec3d &sigmas)
+            : NonlinearFactor({key}), prior_(prior), sigmas_(sigmas) {
+
+            // Validate sigmas
+            if (sigmas.x() <= 0.0 || sigmas.y() <= 0.0 || sigmas.z() <= 0.0) {
+                throw std::invalid_argument("All sigmas must be positive");
+            }
+        }
 
         /**
          * @brief Compute error for this factor
@@ -36,7 +43,27 @@ namespace graphix::factor {
          * @param values Current variable values
          * @return Squared Mahalanobis distance (weighted squared error)
          */
-        double error(const Values &values) const override;
+        inline double error(const Values &values) const override {
+            // Get the variable value
+            Vec3d x = values.at<Vec3d>(keys()[0]);
+
+            // Compute difference
+            Vec3d diff = x - prior_;
+
+            // Compute weighted squared error: sum((diff[i] / sigma[i])^2)
+            double squared_error = 0.0;
+            for (int i = 0; i < 3; i++) {
+                double weighted = diff[i] / sigmas_[i];
+                squared_error += weighted * weighted;
+            }
+
+            // Apply robust loss function if present
+            if (loss_function_) {
+                return loss_function_->evaluate(squared_error);
+            }
+
+            return 0.5 * squared_error;
+        }
 
         /**
          * @brief Get dimension of variable (always 3 for Vec3d)
@@ -49,7 +76,15 @@ namespace graphix::factor {
          * Returns the weighted residual: (x - prior) ./ sigma
          * where ./ is element-wise division
          */
-        std::vector<double> error_vector(const Values &values) const override;
+        inline std::vector<double> error_vector(const Values &values) const override {
+            // Get the variable value
+            Vec3d x = values.at<Vec3d>(keys()[0]);
+
+            // Compute weighted residual: (x - prior) / sigma
+            Vec3d diff = x - prior_;
+
+            return {diff.x() / sigmas_.x(), diff.y() / sigmas_.y(), diff.z() / sigmas_.z()};
+        }
 
         /**
          * @brief Get prior value

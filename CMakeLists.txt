@@ -24,6 +24,33 @@ include(FetchContent)
 
 # --------------------------------------------------------------------------------------------------
 set(ext_deps)
+set(lib_deps)
+
+# --------------------------------------------------------------------------------------------------
+# Mandatory datapod dependency. Prefer local checkout at ../datapod.
+set(GRAPHIX_DATAPOD_SOURCE_DIR "" CACHE PATH "Path to a local datapod checkout (overrides ../datapod)")
+if(GRAPHIX_DATAPOD_SOURCE_DIR AND EXISTS "${GRAPHIX_DATAPOD_SOURCE_DIR}/CMakeLists.txt")
+  FetchContent_Declare(datapod SOURCE_DIR "${GRAPHIX_DATAPOD_SOURCE_DIR}")
+elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../datapod/CMakeLists.txt")
+  FetchContent_Declare(datapod SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../datapod")
+else()
+  FetchContent_Declare(datapod GIT_REPOSITORY https://github.com/robolibs/datapod.git GIT_TAG 0.0.13)
+endif()
+FetchContent_MakeAvailable(datapod)
+list(APPEND lib_deps datapod::datapod)
+
+# --------------------------------------------------------------------------------------------------
+# Mandatory optinum dependency. Prefer local checkout at ../optinum.
+set(GRAPHIX_OPTINUM_SOURCE_DIR "" CACHE PATH "Path to a local optinum checkout (overrides ../optinum)")
+if(GRAPHIX_OPTINUM_SOURCE_DIR AND EXISTS "${GRAPHIX_OPTINUM_SOURCE_DIR}/CMakeLists.txt")
+  FetchContent_Declare(optinum SOURCE_DIR "${GRAPHIX_OPTINUM_SOURCE_DIR}")
+elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../optinum/CMakeLists.txt")
+  FetchContent_Declare(optinum SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../optinum")
+else()
+  FetchContent_Declare(optinum GIT_REPOSITORY https://github.com/robolibs/optinum.git GIT_TAG 0.0.4)
+endif()
+FetchContent_MakeAvailable(optinum)
+list(APPEND lib_deps optinum::optinum)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -37,6 +64,9 @@ if(LIB_SOURCES)
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
     )
+    target_link_libraries(${project_name} PUBLIC ${lib_deps})
+    # Always enable datapod short namespace alias: dp::
+    target_compile_definitions(${project_name} PUBLIC SHORT_NAMESPACE)
     target_compile_options(${project_name} PRIVATE ${params})
 else()
     add_library(${project_name} INTERFACE)
@@ -44,6 +74,8 @@ else()
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
     )
+    target_link_libraries(${project_name} INTERFACE ${lib_deps})
+    target_compile_definitions(${project_name} INTERFACE SHORT_NAMESPACE)
 endif()
 
 # Allow users to link via `${project_name}::${project_name}`
@@ -80,9 +112,10 @@ export(EXPORT ${project_name}Targets
 
 # --------------------------------------------------------------------------------------------------
 if(${project_name_upper}_BUILD_EXAMPLES)
-  add_definitions(-DHAS_RERUN)
   find_package(rerun_sdk QUIET)
-  list(APPEND ext_deps rerun_sdk)
+  if(TARGET rerun_sdk OR TARGET rerun_sdk::rerun_sdk)
+    list(APPEND ext_deps rerun_sdk)
+  endif()
 
   file(GLOB exe CONFIGURE_DEPENDS examples/*.cpp)
   # ----------------------------------------------
@@ -90,7 +123,11 @@ if(${project_name_upper}_BUILD_EXAMPLES)
   foreach(src_file IN LISTS exe)
     get_filename_component(exec_name "${src_file}" NAME_WE)
     add_executable(${exec_name} "${src_file}")
+    if(TARGET rerun_sdk OR TARGET rerun_sdk::rerun_sdk)
+      target_compile_definitions(${exec_name} PRIVATE HAS_RERUN)
+    endif()
     target_compile_options(${exec_name} PRIVATE ${params})
+    target_compile_definitions(${exec_name} PRIVATE SHORT_NAMESPACE)
     target_link_libraries(${exec_name} ${project_name}::${project_name} ${ext_deps})
     install(TARGETS ${exec_name} DESTINATION bin)
     list(APPEND exec_names ${exec_name})

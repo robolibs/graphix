@@ -2,9 +2,24 @@
 
 #include "graphix/factor/nonlinear/nonlinear_factor.hpp"
 #include "graphix/factor/types/vec3d.hpp"
+#include <cmath>
 #include <stdexcept>
 
 namespace graphix::factor {
+
+    namespace detail {
+        inline double wrap_angle_pi(double angle_rad) {
+            constexpr double kPi = 3.14159265358979323846;
+            constexpr double kTwoPi = 2.0 * kPi;
+            while (angle_rad > kPi) {
+                angle_rad -= kTwoPi;
+            }
+            while (angle_rad < -kPi) {
+                angle_rad += kTwoPi;
+            }
+            return angle_rad;
+        }
+    } // namespace detail
 
     /**
      * @brief Between factor for Vec3d variables
@@ -33,7 +48,14 @@ namespace graphix::factor {
          * @param measured Measured relative difference (vj - vi)
          * @param sigmas Standard deviations for each dimension
          */
-        Vec3BetweenFactor(Key key_i, Key key_j, const Vec3d &measured, const Vec3d &sigmas);
+        inline Vec3BetweenFactor(Key key_i, Key key_j, const Vec3d &measured, const Vec3d &sigmas)
+            : NonlinearFactor({key_i, key_j}), measured_(measured), sigmas_(sigmas) {
+
+            // Validate sigmas
+            if (sigmas.x() <= 0.0 || sigmas.y() <= 0.0 || sigmas.z() <= 0.0) {
+                throw std::invalid_argument("All sigmas must be positive");
+            }
+        }
 
         /**
          * @brief Compute error for this factor
@@ -43,7 +65,45 @@ namespace graphix::factor {
          * @param values Current variable values
          * @return Squared Mahalanobis distance (weighted squared error)
          */
-        double error(const Values &values) const override;
+        inline double error(const Values &values) const override {
+            // Get the two variable values
+            Vec3d vi = values.at<Vec3d>(keys()[0]);
+            Vec3d vj = values.at<Vec3d>(keys()[1]);
+
+            // Interpret Vec3d as 2D pose (x, y, theta).
+            // Measurement is in the local frame of pose i (odometry-style).
+            const double theta_i = vi.z();
+            const double dx_world = vj.x() - vi.x();
+            const double dy_world = vj.y() - vi.y();
+
+            // Rotate world delta into i frame: R(-theta_i) * (t_j - t_i)
+            const double c = std::cos(theta_i);
+            const double s = std::sin(theta_i);
+            const double dx_local = c * dx_world + s * dy_world;
+            const double dy_local = -s * dx_world + c * dy_world;
+
+            const double dtheta = detail::wrap_angle_pi(vj.z() - vi.z());
+
+            Vec3d predicted(dx_local, dy_local, dtheta);
+
+            // Residual (wrap angle component)
+            Vec3d diff = predicted - measured_;
+            diff.z() = detail::wrap_angle_pi(diff.z());
+
+            // Compute weighted squared error: sum((diff[i] / sigma[i])^2)
+            double squared_error = 0.0;
+            for (int i = 0; i < 3; i++) {
+                double weighted = diff[i] / sigmas_[i];
+                squared_error += weighted * weighted;
+            }
+
+            // Apply robust loss function if present
+            if (loss_function_) {
+                return loss_function_->evaluate(squared_error);
+            }
+
+            return 0.5 * squared_error;
+        }
 
         /**
          * @brief Get dimension of variable (always 3 for Vec3d)
@@ -55,7 +115,34 @@ namespace graphix::factor {
          *
          * Returns the weighted residual: (predicted - measured) ./ sigma
          */
-        std::vector<double> error_vector(const Values &values) const override;
+        inline std::vector<double> error_vector(const Values &values) const override {
+            // Get the two variable values
+            Vec3d vi = values.at<Vec3d>(keys()[0]);
+            Vec3d vj = values.at<Vec3d>(keys()[1]);
+
+            // Interpret Vec3d as 2D pose (x, y, theta).
+            // Measurement is in the local frame of pose i (odometry-style).
+            const double theta_i = vi.z();
+            const double dx_world = vj.x() - vi.x();
+            const double dy_world = vj.y() - vi.y();
+
+            // Rotate world delta into i frame: R(-theta_i) * (t_j - t_i)
+            const double c = std::cos(theta_i);
+            const double s = std::sin(theta_i);
+            const double dx_local = c * dx_world + s * dy_world;
+            const double dy_local = -s * dx_world + c * dy_world;
+
+            const double dtheta = detail::wrap_angle_pi(vj.z() - vi.z());
+
+            Vec3d predicted(dx_local, dy_local, dtheta);
+
+            // Residual (wrap angle component)
+            Vec3d diff = predicted - measured_;
+            diff.z() = detail::wrap_angle_pi(diff.z());
+
+            // Return weighted residual
+            return {diff.x() / sigmas_.x(), diff.y() / sigmas_.y(), diff.z() / sigmas_.z()};
+        }
 
         /**
          * @brief Get measured value
