@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 set(project_name graphix)
-project(${project_name} VERSION 0.1.0 LANGUAGES CXX)
+project(${project_name} VERSION 0.0.0 LANGUAGES CXX)
 
 add_compile_options(-Wall -Wextra -Wpedantic)
 cmake_policy(SET CMP0074 NEW)
@@ -34,7 +34,7 @@ if(GRAPHIX_DATAPOD_SOURCE_DIR AND EXISTS "${GRAPHIX_DATAPOD_SOURCE_DIR}/CMakeLis
 elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../datapod/CMakeLists.txt")
   FetchContent_Declare(datapod SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../datapod")
 else()
-  FetchContent_Declare(datapod GIT_REPOSITORY https://github.com/robolibs/datapod.git GIT_TAG 0.0.13)
+  FetchContent_Declare(datapod GIT_REPOSITORY https://github.com/robolibs/datapod.git GIT_TAG 0.0.15)
 endif()
 FetchContent_MakeAvailable(datapod)
 list(APPEND lib_deps datapod::datapod)
@@ -47,7 +47,7 @@ if(GRAPHIX_OPTINUM_SOURCE_DIR AND EXISTS "${GRAPHIX_OPTINUM_SOURCE_DIR}/CMakeLis
 elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../optinum/CMakeLists.txt")
   FetchContent_Declare(optinum SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../optinum")
 else()
-  FetchContent_Declare(optinum GIT_REPOSITORY https://github.com/robolibs/optinum.git GIT_TAG 0.0.4)
+  FetchContent_Declare(optinum GIT_REPOSITORY https://github.com/robolibs/optinum.git GIT_TAG 0.0.7)
 endif()
 FetchContent_MakeAvailable(optinum)
 list(APPEND lib_deps optinum::optinum)

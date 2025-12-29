@@ -1,5 +1,5 @@
 set_project("graphix")
-set_version("0.1.0")
+set_version("0.0.0")
 set_xmakever("2.7.0")
 
 -- Set C++ standard
@@ -115,7 +115,7 @@ package("datapod")
         if not os.isdir(sourcedir) then
             print("Fetching datapod from git...")
             os.mkdir(path.directory(sourcedir))
-            os.execv("git", {"clone", "--quiet", "--depth", "1", "--branch", "0.0.13",
+            os.execv("git", {"clone", "--quiet", "--depth", "1", "--branch", "0.0.15",
                             "-c", "advice.detachedHead=false",
                             "https://github.com/robolibs/datapod.git", sourcedir})
         end
@@ -145,7 +145,7 @@ package("optinum")
         if not os.isdir(sourcedir) then
             print("Fetching optinum from git...")
             os.mkdir(path.directory(sourcedir))
-            os.execv("git", {"clone", "--quiet", "--depth", "1", "--branch", "0.0.4",
+            os.execv("git", {"clone", "--quiet", "--depth", "1", "--branch", "0.0.7",
                             "-c", "advice.detachedHead=false",
                             "https://github.com/robolibs/optinum.git", sourcedir})
         end
