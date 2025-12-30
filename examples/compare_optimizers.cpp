@@ -2,16 +2,18 @@
  * @file compare_optimizers.cpp
  * @brief Compare Gradient Descent vs Gauss-Newton vs Levenberg-Marquardt on 2D SLAM
  *
- * This example compares three optimization methods on the same SLAM problem:
+ * This example compares optimization methods on the same SLAM problem:
  * 1. Gradient Descent (first-order, many iterations)
  * 2. Gauss-Newton (second-order, few iterations, less robust)
  * 3. Levenberg-Marquardt (second-order, adaptive damping, most robust)
+ * 4. OptinumGaussNewton (adapter using optinum's optimizer)
  */
 
 #include "graphix/factor/graph.hpp"
 #include "graphix/factor/nonlinear/gauss_newton.hpp"
 #include "graphix/factor/nonlinear/gradient_descent.hpp"
 #include "graphix/factor/nonlinear/levenberg_marquardt.hpp"
+#include "graphix/factor/nonlinear/optimizer_adapter.hpp"
 #include "graphix/factor/nonlinear/vec3_between_factor.hpp"
 #include "graphix/factor/nonlinear/vec3_prior_factor.hpp"
 #include "graphix/kernel.hpp"
@@ -171,7 +173,40 @@ int main() {
     std::cout << std::endl;
 
     // ========================================
-    // 5. Comparison
+    // 5. Optimize with OptinumGaussNewton (adapter)
+    // ========================================
+
+    std::cout << "=== Optinum GaussNewton (adapter) ===" << std::endl;
+
+    OptinumGaussNewton og_optimizer;
+    og_optimizer.max_iterations = 100;
+    og_optimizer.tolerance = 1e-6;
+    og_optimizer.verbose = false;
+
+    auto og_start = std::chrono::high_resolution_clock::now();
+    auto og_result = og_optimizer.optimize(graph, initial);
+    auto og_end = std::chrono::high_resolution_clock::now();
+
+    auto og_duration = std::chrono::duration_cast<std::chrono::microseconds>(og_end - og_start);
+
+    std::cout << "Iterations: " << og_result.iterations << std::endl;
+    std::cout << "Converged: " << (og_result.converged ? "yes" : "no") << std::endl;
+    std::cout << "Final error: " << std::fixed << std::setprecision(6) << og_result.final_error << std::endl;
+    std::cout << "Time: " << og_duration.count() / 1000.0 << " ms" << std::endl;
+    std::cout << std::endl;
+
+    // Check loop closure error for OptinumGN
+    Vec3d og_final = og_result.values.at<Vec3d>(X(4));
+    Vec3d og_start_pose = og_result.values.at<Vec3d>(X(0));
+    double og_dx = og_final[0] - og_start_pose[0];
+    double og_dy = og_final[1] - og_start_pose[1];
+    double og_loop_dist = std::sqrt(og_dx * og_dx + og_dy * og_dy);
+    std::cout << "Loop closure error: " << std::fixed << std::setprecision(3) << og_loop_dist * 1000 << " mm"
+              << std::endl;
+    std::cout << std::endl;
+
+    // ========================================
+    // 6. Comparison
     // ========================================
 
     std::cout << "=== Comparison ===" << std::endl;
@@ -184,8 +219,10 @@ int main() {
     double gd_time_ms = gd_duration.count() / 1000.0;
     double gn_time_ms = gn_duration.count() / 1000.0;
     double lm_time_ms = lm_duration.count() / 1000.0;
+    double og_time_ms = og_duration.count() / 1000.0;
     double gn_speedup = gd_duration.count() / (double)gn_duration.count();
     double lm_speedup = gd_duration.count() / (double)lm_duration.count();
+    double og_speedup = gd_duration.count() / (double)og_duration.count();
 
     std::cout << std::setw(25) << "Gradient Descent" << std::setw(15) << gd_result.iterations << std::setw(15)
               << std::fixed << std::setprecision(3) << gd_time_ms << std::setw(15) << std::fixed << std::setprecision(6)
@@ -201,19 +238,26 @@ int main() {
               << lm_result.final_error << std::setw(15) << std::fixed << std::setprecision(1) << lm_speedup << "x"
               << std::endl;
 
+    std::cout << std::setw(25) << "Optinum GaussNewton" << std::setw(15) << og_result.iterations << std::setw(15)
+              << std::fixed << std::setprecision(3) << og_time_ms << std::setw(15) << std::fixed << std::setprecision(6)
+              << og_result.final_error << std::setw(15) << std::fixed << std::setprecision(1) << og_speedup << "x"
+              << std::endl;
+
     std::cout << std::endl;
 
     std::cout << "=== Summary ===" << std::endl;
-    std::cout << "✓ Gauss-Newton converges in " << (gd_result.iterations / gn_result.iterations) << "x fewer iterations"
+    std::cout << "- Gauss-Newton converges in " << (gd_result.iterations / gn_result.iterations) << "x fewer iterations"
               << std::endl;
-    std::cout << "✓ Levenberg-Marquardt converges in " << (gd_result.iterations / lm_result.iterations)
+    std::cout << "- Levenberg-Marquardt converges in " << (gd_result.iterations / lm_result.iterations)
               << "x fewer iterations" << std::endl;
-    std::cout << "✓ Gauss-Newton is " << std::fixed << std::setprecision(1) << gn_speedup
+    std::cout << "- Gauss-Newton is " << std::fixed << std::setprecision(1) << gn_speedup
               << "x faster than gradient descent" << std::endl;
-    std::cout << "✓ Levenberg-Marquardt is " << std::fixed << std::setprecision(1) << lm_speedup
+    std::cout << "- Levenberg-Marquardt is " << std::fixed << std::setprecision(1) << lm_speedup
               << "x faster than gradient descent" << std::endl;
-    std::cout << "✓ All methods achieve similar final accuracy" << std::endl;
-    std::cout << "✓ LM offers best balance of speed and robustness for SLAM!" << std::endl;
+    std::cout << "- Optinum GaussNewton is " << std::fixed << std::setprecision(1) << og_speedup
+              << "x faster than gradient descent" << std::endl;
+    std::cout << "- All methods achieve similar final accuracy" << std::endl;
+    std::cout << "- LM offers best balance of speed and robustness for SLAM!" << std::endl;
 
     return 0;
 }
