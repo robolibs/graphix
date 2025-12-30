@@ -16,7 +16,10 @@
 #include "graphix/factor/types.hpp"
 #include "graphix/factor/values.hpp"
 
+#include <cmath>
 #include <datapod/matrix.hpp>
+#include <iostream>
+#include <limits>
 #include <map>
 #include <stdexcept>
 #include <vector>
@@ -477,6 +480,462 @@ namespace graphix::factor {
             }
 
             return OptimizerResult(current_values, current_error, static_cast<int>(iteration), converged);
+        }
+    };
+
+    /**
+     * @brief Wrapper to use optinum::opti::LevenbergMarquardt with graphix factor graphs
+     *
+     * Provides the same interface as graphix::factor::LevenbergMarquardtOptimizer
+     * but uses optinum-style Levenberg-Marquardt implementation internally.
+     *
+     * Levenberg-Marquardt improves on Gauss-Newton by adding a damping term:
+     *   (J^T * J + λ*I) * dx = -J^T * r
+     *
+     * The damping parameter λ is adaptively adjusted:
+     * - If error decreases: λ is reduced (approach Gauss-Newton)
+     * - If error increases: λ is increased (approach gradient descent)
+     *
+     * Usage:
+     * @code
+     * OptinumLevenbergMarquardt optimizer;
+     * optimizer.max_iterations = 50;
+     * optimizer.tolerance = 1e-6;
+     * optimizer.initial_lambda = 1e-3;
+     *
+     * auto result = optimizer.optimize(graph, initial_values);
+     * Values optimized = result.values;
+     * @endcode
+     */
+    class OptinumLevenbergMarquardt {
+      public:
+        // Configuration parameters (matching optinum::opti::LevenbergMarquardt)
+        std::size_t max_iterations = 100;
+        double tolerance = 1e-6;
+        double min_step_norm = 1e-9;
+        double min_gradient_norm = 1e-6;
+        double initial_lambda = 1e-3;
+        double lambda_factor = 10.0;
+        double min_lambda = 1e-7;
+        double max_lambda = 1e7;
+        bool verbose = false;
+
+        OptinumLevenbergMarquardt() = default;
+
+        /**
+         * @brief Optimize a factor graph starting from initial values
+         *
+         * @param graph Factor graph to optimize
+         * @param initial Initial variable values
+         * @return Optimization result with final values and diagnostics
+         */
+        inline OptimizerResult optimize(const Graph<NonlinearFactor> &graph, const Values &initial) const {
+            // Create adapter
+            FactorGraphAdapter adapter(graph, initial);
+
+            // Convert initial values to parameter vector
+            DynVec x = adapter.values_to_params(initial);
+            const std::size_t n = x.size();
+
+            // Initial error and damping
+            double current_error = adapter.compute_error(initial);
+            double lambda = initial_lambda;
+
+            if (verbose) {
+                std::cout << "OptinumLevenbergMarquardt Optimization" << std::endl;
+                std::cout << "Variables: " << adapter.param_dim() << ", Residuals: " << adapter.residual_dim()
+                          << std::endl;
+                std::cout << "Initial error: " << current_error << std::endl;
+                std::cout << "Initial lambda: " << lambda << std::endl;
+            }
+
+            Values current_values = initial;
+            bool converged = false;
+            std::size_t iteration = 0;
+
+            for (; iteration < max_iterations; ++iteration) {
+                // Get Jacobian and residual
+                DynMat J = adapter.jacobian(x);
+                DynVec r = adapter(x);
+
+                // Build damped normal equations: (J^T * J + λ*I) * dx = -J^T * r
+                DynMat JtJ = matmul(transpose(J), J);
+                DynVec Jtr = matmul(transpose(J), r);
+
+                // Add damping to diagonal
+                add_diagonal(JtJ, lambda);
+
+                // Negate for -J^T * r
+                for (std::size_t i = 0; i < Jtr.size(); ++i) {
+                    Jtr[i] = -Jtr[i];
+                }
+
+                // Try to solve linear system
+                auto solve_result = try_solve(JtJ, Jtr);
+                if (!solve_result.is_ok()) {
+                    // Solve failed - increase damping and retry
+                    if (verbose) {
+                        std::cout << "Iter " << iteration << ": Solve failed, increasing lambda from " << lambda
+                                  << " to " << lambda * lambda_factor << std::endl;
+                    }
+                    lambda = std::min(lambda * lambda_factor, max_lambda);
+
+                    if (lambda >= max_lambda) {
+                        if (verbose) {
+                            std::cout << "Lambda reached maximum, terminating" << std::endl;
+                        }
+                        break;
+                    }
+                    continue; // Retry with larger lambda
+                }
+
+                DynVec dx = solve_result.value();
+
+                // Compute step norm
+                double step_norm = norm(dx);
+
+                if (verbose) {
+                    std::cout << "Iter " << iteration << ": error = " << current_error << ", step_norm = " << step_norm
+                              << ", lambda = " << lambda << std::endl;
+                }
+
+                if (step_norm < min_step_norm) {
+                    if (verbose) {
+                        std::cout << "Converged: step_norm < " << min_step_norm << std::endl;
+                    }
+                    converged = true;
+                    break;
+                }
+
+                // Try the step: x_new = x + dx
+                DynVec x_new(n);
+                for (std::size_t i = 0; i < n; ++i) {
+                    x_new[i] = x[i] + dx[i];
+                }
+
+                // Evaluate new error
+                Values new_values = adapter.params_to_values(x_new);
+                double new_error = adapter.compute_error(new_values);
+
+                // Adaptive lambda adjustment based on error improvement
+                if (new_error < current_error) {
+                    // Good step - accept and decrease lambda (approach Gauss-Newton)
+                    double error_decrease = current_error - new_error;
+
+                    if (verbose) {
+                        std::cout << "  Step accepted, error decreased by " << error_decrease << std::endl;
+                        std::cout << "  Decreasing lambda from " << lambda << " to "
+                                  << std::max(lambda / lambda_factor, min_lambda) << std::endl;
+                    }
+
+                    x = x_new;
+                    current_values = new_values;
+                    current_error = new_error;
+                    lambda = std::max(lambda / lambda_factor, min_lambda);
+
+                    // Check convergence on error decrease
+                    if (std::abs(error_decrease) < tolerance) {
+                        if (verbose) {
+                            std::cout << "Converged: error_decrease < " << tolerance << std::endl;
+                        }
+                        converged = true;
+                        break;
+                    }
+                } else {
+                    // Bad step - reject and increase lambda (approach gradient descent)
+                    if (verbose) {
+                        std::cout << "  Step rejected, error increased from " << current_error << " to " << new_error
+                                  << std::endl;
+                        std::cout << "  Increasing lambda from " << lambda << " to "
+                                  << std::min(lambda * lambda_factor, max_lambda) << std::endl;
+                    }
+
+                    lambda = std::min(lambda * lambda_factor, max_lambda);
+
+                    if (lambda >= max_lambda) {
+                        if (verbose) {
+                            std::cout << "Lambda reached maximum, terminating" << std::endl;
+                        }
+                        break;
+                    }
+                    // Don't update x or current_error - retry with larger lambda
+                }
+            }
+
+            if (!converged && verbose) {
+                std::cout << "Max iterations reached" << std::endl;
+            }
+
+            return OptimizerResult(current_values, current_error, static_cast<int>(iteration), converged);
+        }
+    };
+
+    /**
+     * @brief Objective function adapter for gradient-based optimizers
+     *
+     * Wraps a factor graph to provide the evaluate/gradient interface expected
+     * by optinum's GradientDescent optimizer. Computes:
+     * - evaluate(x): total weighted squared error
+     * - gradient(x, g): numerical gradient using finite differences
+     * - evaluate_with_gradient(x, g): combined evaluation
+     */
+    class FactorGraphObjective {
+      public:
+        /**
+         * @brief Construct objective from a factor graph and initial values
+         *
+         * @param graph Factor graph containing constraints
+         * @param values Initial values (used for type inference)
+         * @param h Step size for finite difference gradient (default: 1e-5)
+         */
+        inline FactorGraphObjective(const Graph<NonlinearFactor> &graph, const Values &values, double h = 1e-5)
+            : adapter_(graph, values), h_(h) {}
+
+        /**
+         * @brief Evaluate the objective function (total error)
+         *
+         * @param params Parameter vector
+         * @return Total weighted squared error
+         */
+        inline double evaluate(const DynVec &params) const { return adapter_.compute_error(params); }
+
+        /**
+         * @brief Compute gradient using finite differences
+         *
+         * @param params Parameter vector
+         * @param gradient Output gradient vector
+         */
+        inline void gradient(const DynVec &params, DynVec &gradient) const {
+            const std::size_t n = params.size();
+
+            // Ensure gradient is properly sized
+            if (gradient.size() != n) {
+                gradient = DynVec(n);
+            }
+
+            // Central finite difference for each parameter
+            DynVec params_plus = params;
+            DynVec params_minus = params;
+
+            for (std::size_t i = 0; i < n; ++i) {
+                params_plus[i] = params[i] + h_;
+                params_minus[i] = params[i] - h_;
+
+                double error_plus = adapter_.compute_error(params_plus);
+                double error_minus = adapter_.compute_error(params_minus);
+
+                gradient[i] = (error_plus - error_minus) / (2.0 * h_);
+
+                // Restore original values
+                params_plus[i] = params[i];
+                params_minus[i] = params[i];
+            }
+        }
+
+        /**
+         * @brief Combined evaluation for efficiency (required by optinum GradientDescent)
+         *
+         * @param params Parameter vector
+         * @param grad Output gradient vector
+         * @return Objective value
+         */
+        inline double evaluate_with_gradient(const DynVec &params, DynVec &grad) const {
+            gradient(params, grad);
+            return evaluate(params);
+        }
+
+        /**
+         * @brief Get the underlying adapter
+         */
+        const FactorGraphAdapter &adapter() const { return adapter_; }
+
+      private:
+        FactorGraphAdapter adapter_;
+        double h_; ///< Step size for finite differences
+    };
+
+    /**
+     * @brief Wrapper to use optinum-style gradient descent with graphix factor graphs
+     *
+     * Provides a simple gradient descent optimizer that uses the FactorGraphObjective
+     * adapter. Supports vanilla gradient descent and Adam-style adaptive learning rates.
+     *
+     * Usage:
+     * @code
+     * OptinumGradientDescent optimizer;
+     * optimizer.step_size = 0.01;
+     * optimizer.max_iterations = 1000;
+     * optimizer.use_adam = true;  // Enable Adam optimizer
+     *
+     * auto result = optimizer.optimize(graph, initial_values);
+     * Values optimized = result.values;
+     * @endcode
+     */
+    class OptinumGradientDescent {
+      public:
+        // Configuration parameters (matching optinum::opti::GradientDescent)
+        double step_size = 0.01;
+        std::size_t max_iterations = 10000;
+        double tolerance = 1e-6;
+        double h = 1e-5; ///< Step size for finite difference gradient
+        bool verbose = false;
+
+        // Adam parameters
+        bool use_adam = false;
+        double adam_beta1 = 0.9;
+        double adam_beta2 = 0.999;
+        double adam_epsilon = 1e-8;
+
+        OptinumGradientDescent() = default;
+
+        /**
+         * @brief Gradient descent result with additional gradient norm info
+         */
+        struct Result : public OptimizerResult {
+            double gradient_norm;
+
+            Result(const Values &v, double err, int iter, bool conv, double gnorm)
+                : OptimizerResult(v, err, iter, conv), gradient_norm(gnorm) {}
+        };
+
+        /**
+         * @brief Optimize a factor graph starting from initial values
+         *
+         * @param graph Factor graph to optimize
+         * @param initial Initial variable values
+         * @return Optimization result with final values and diagnostics
+         */
+        inline Result optimize(const Graph<NonlinearFactor> &graph, const Values &initial) const {
+            // Create objective function adapter
+            FactorGraphObjective objective(graph, initial, h);
+            const auto &adapter = objective.adapter();
+
+            // Convert initial values to parameter vector
+            DynVec x = adapter.values_to_params(initial);
+            const std::size_t n = x.size();
+
+            // Allocate gradient
+            DynVec gradient(n);
+
+            // Adam state (first and second moments)
+            DynVec m(n, 0.0); // First moment
+            DynVec v(n, 0.0); // Second moment
+            std::size_t t = 0;
+
+            double current_error = objective.evaluate(x);
+            double last_error = std::numeric_limits<double>::max();
+            double gnorm = 0.0;
+
+            if (verbose) {
+                std::cout << "OptinumGradientDescent Optimization" << std::endl;
+                std::cout << "Variables: " << adapter.param_dim() << std::endl;
+                std::cout << "Initial error: " << current_error << std::endl;
+                if (use_adam) {
+                    std::cout << "Using Adam optimizer" << std::endl;
+                }
+            }
+
+            Values current_values = initial;
+            bool converged = false;
+            std::size_t iteration = 0;
+
+            for (; iteration < max_iterations; ++iteration) {
+                // Compute gradient
+                objective.gradient(x, gradient);
+
+                // Compute gradient norm
+                gnorm = norm(gradient);
+
+                if (verbose && (iteration % 100 == 0 || iteration < 10)) {
+                    std::cout << "Iter " << iteration << ": error = " << current_error << ", ||g|| = " << gnorm
+                              << std::endl;
+                }
+
+                // Check convergence on gradient norm
+                if (gnorm < tolerance) {
+                    if (verbose) {
+                        std::cout << "Converged: gradient_norm < " << tolerance << std::endl;
+                    }
+                    converged = true;
+                    break;
+                }
+
+                // Apply update
+                if (use_adam) {
+                    // Adam update
+                    ++t;
+                    double bias_correction1 = 1.0 - std::pow(adam_beta1, static_cast<double>(t));
+                    double bias_correction2 = 1.0 - std::pow(adam_beta2, static_cast<double>(t));
+                    double step_correction = step_size * std::sqrt(bias_correction2) / bias_correction1;
+
+                    for (std::size_t i = 0; i < n; ++i) {
+                        // Update moments
+                        m[i] = adam_beta1 * m[i] + (1.0 - adam_beta1) * gradient[i];
+                        v[i] = adam_beta2 * v[i] + (1.0 - adam_beta2) * gradient[i] * gradient[i];
+
+                        // Apply update
+                        x[i] -= step_correction * m[i] / (std::sqrt(v[i]) + adam_epsilon);
+                    }
+                } else {
+                    // Vanilla gradient descent with backtracking line search
+                    double step = step_size;
+                    DynVec x_new(n);
+
+                    for (std::size_t i = 0; i < n; ++i) {
+                        x_new[i] = x[i] - step * gradient[i];
+                    }
+
+                    double new_error = objective.evaluate(x_new);
+                    int backtrack_count = 0;
+                    const int max_backtrack = 20;
+
+                    while (new_error > current_error && backtrack_count < max_backtrack) {
+                        step *= 0.5;
+                        for (std::size_t i = 0; i < n; ++i) {
+                            x_new[i] = x[i] - step * gradient[i];
+                        }
+                        new_error = objective.evaluate(x_new);
+                        ++backtrack_count;
+                    }
+
+                    if (verbose && backtrack_count > 0 && (iteration % 100 == 0 || iteration < 10)) {
+                        std::cout << "  Backtracked " << backtrack_count << " times, step = " << step << std::endl;
+                    }
+
+                    // If we couldn't improve, we're stuck
+                    if (new_error >= current_error && backtrack_count >= max_backtrack) {
+                        if (verbose) {
+                            std::cout << "Cannot improve further, stopping" << std::endl;
+                        }
+                        break;
+                    }
+
+                    x = x_new;
+                }
+
+                // Evaluate new error
+                double new_error = objective.evaluate(x);
+
+                // Check convergence on error decrease
+                if (std::abs(last_error - new_error) < tolerance) {
+                    if (verbose) {
+                        std::cout << "Converged: error_change < " << tolerance << std::endl;
+                    }
+                    current_error = new_error;
+                    converged = true;
+                    break;
+                }
+
+                last_error = current_error;
+                current_error = new_error;
+            }
+
+            if (!converged && verbose) {
+                std::cout << "Max iterations reached" << std::endl;
+            }
+
+            current_values = adapter.params_to_values(x);
+            return Result(current_values, current_error, static_cast<int>(iteration), converged, gnorm);
         }
     };
 

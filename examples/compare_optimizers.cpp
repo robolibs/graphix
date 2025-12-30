@@ -6,7 +6,9 @@
  * 1. Gradient Descent (first-order, many iterations)
  * 2. Gauss-Newton (second-order, few iterations, less robust)
  * 3. Levenberg-Marquardt (second-order, adaptive damping, most robust)
- * 4. OptinumGaussNewton (adapter using optinum's optimizer)
+ * 4. OptinumGaussNewton (adapter using optinum-style optimizer)
+ * 5. OptinumLevenbergMarquardt (adapter using optinum-style LM optimizer)
+ * 6. OptinumGradientDescent (adapter using optinum-style gradient descent)
  */
 
 #include "graphix/factor/graph.hpp"
@@ -206,55 +208,141 @@ int main() {
     std::cout << std::endl;
 
     // ========================================
-    // 6. Comparison
+    // 6. Optimize with OptinumLevenbergMarquardt (adapter)
+    // ========================================
+
+    std::cout << "=== Optinum LevenbergMarquardt (adapter) ===" << std::endl;
+
+    OptinumLevenbergMarquardt olm_optimizer;
+    olm_optimizer.max_iterations = 100;
+    olm_optimizer.tolerance = 1e-6;
+    olm_optimizer.initial_lambda = 1e-3;
+    olm_optimizer.lambda_factor = 10.0;
+    olm_optimizer.verbose = false;
+
+    auto olm_start = std::chrono::high_resolution_clock::now();
+    auto olm_result = olm_optimizer.optimize(graph, initial);
+    auto olm_end = std::chrono::high_resolution_clock::now();
+
+    auto olm_duration = std::chrono::duration_cast<std::chrono::microseconds>(olm_end - olm_start);
+
+    std::cout << "Iterations: " << olm_result.iterations << std::endl;
+    std::cout << "Converged: " << (olm_result.converged ? "yes" : "no") << std::endl;
+    std::cout << "Final error: " << std::fixed << std::setprecision(6) << olm_result.final_error << std::endl;
+    std::cout << "Time: " << olm_duration.count() / 1000.0 << " ms" << std::endl;
+    std::cout << std::endl;
+
+    // Check loop closure error for OptinumLM
+    Vec3d olm_final = olm_result.values.at<Vec3d>(X(4));
+    Vec3d olm_start_pose = olm_result.values.at<Vec3d>(X(0));
+    double olm_dx = olm_final[0] - olm_start_pose[0];
+    double olm_dy = olm_final[1] - olm_start_pose[1];
+    double olm_loop_dist = std::sqrt(olm_dx * olm_dx + olm_dy * olm_dy);
+    std::cout << "Loop closure error: " << std::fixed << std::setprecision(3) << olm_loop_dist * 1000 << " mm"
+              << std::endl;
+    std::cout << std::endl;
+
+    // ========================================
+    // 7. Optimize with OptinumGradientDescent (adapter)
+    // ========================================
+
+    std::cout << "=== Optinum GradientDescent (adapter) ===" << std::endl;
+
+    OptinumGradientDescent ogd_optimizer;
+    ogd_optimizer.step_size = 0.05;
+    ogd_optimizer.max_iterations = 200;
+    ogd_optimizer.tolerance = 1e-6;
+    ogd_optimizer.use_adam = true; // Use Adam for faster convergence
+    ogd_optimizer.verbose = false;
+
+    auto ogd_start = std::chrono::high_resolution_clock::now();
+    auto ogd_result = ogd_optimizer.optimize(graph, initial);
+    auto ogd_end = std::chrono::high_resolution_clock::now();
+
+    auto ogd_duration = std::chrono::duration_cast<std::chrono::microseconds>(ogd_end - ogd_start);
+
+    std::cout << "Iterations: " << ogd_result.iterations << std::endl;
+    std::cout << "Converged: " << (ogd_result.converged ? "yes" : "no") << std::endl;
+    std::cout << "Final error: " << std::fixed << std::setprecision(6) << ogd_result.final_error << std::endl;
+    std::cout << "Time: " << ogd_duration.count() / 1000.0 << " ms" << std::endl;
+    std::cout << std::endl;
+
+    // Check loop closure error for OptinumGD
+    Vec3d ogd_final = ogd_result.values.at<Vec3d>(X(4));
+    Vec3d ogd_start_pose = ogd_result.values.at<Vec3d>(X(0));
+    double ogd_dx = ogd_final[0] - ogd_start_pose[0];
+    double ogd_dy = ogd_final[1] - ogd_start_pose[1];
+    double ogd_loop_dist = std::sqrt(ogd_dx * ogd_dx + ogd_dy * ogd_dy);
+    std::cout << "Loop closure error: " << std::fixed << std::setprecision(3) << ogd_loop_dist * 1000 << " mm"
+              << std::endl;
+    std::cout << std::endl;
+
+    // ========================================
+    // 8. Comparison
     // ========================================
 
     std::cout << "=== Comparison ===" << std::endl;
     std::cout << std::endl;
 
-    std::cout << std::setw(25) << "Method" << std::setw(15) << "Iterations" << std::setw(15) << "Time (ms)"
+    std::cout << std::setw(30) << "Method" << std::setw(15) << "Iterations" << std::setw(15) << "Time (ms)"
               << std::setw(15) << "Final Error" << std::setw(15) << "Speedup" << std::endl;
-    std::cout << std::string(85, '-') << std::endl;
+    std::cout << std::string(90, '-') << std::endl;
 
     double gd_time_ms = gd_duration.count() / 1000.0;
     double gn_time_ms = gn_duration.count() / 1000.0;
     double lm_time_ms = lm_duration.count() / 1000.0;
     double og_time_ms = og_duration.count() / 1000.0;
+    double olm_time_ms = olm_duration.count() / 1000.0;
+    double ogd_time_ms = ogd_duration.count() / 1000.0;
     double gn_speedup = gd_duration.count() / (double)gn_duration.count();
     double lm_speedup = gd_duration.count() / (double)lm_duration.count();
     double og_speedup = gd_duration.count() / (double)og_duration.count();
+    double olm_speedup = gd_duration.count() / (double)olm_duration.count();
+    double ogd_speedup = gd_duration.count() / (double)ogd_duration.count();
 
-    std::cout << std::setw(25) << "Gradient Descent" << std::setw(15) << gd_result.iterations << std::setw(15)
+    std::cout << std::setw(30) << "Gradient Descent" << std::setw(15) << gd_result.iterations << std::setw(15)
               << std::fixed << std::setprecision(3) << gd_time_ms << std::setw(15) << std::fixed << std::setprecision(6)
               << gd_result.final_error << std::setw(15) << "1.0x" << std::endl;
 
-    std::cout << std::setw(25) << "Gauss-Newton" << std::setw(15) << gn_result.iterations << std::setw(15) << std::fixed
+    std::cout << std::setw(30) << "Gauss-Newton" << std::setw(15) << gn_result.iterations << std::setw(15) << std::fixed
               << std::setprecision(3) << gn_time_ms << std::setw(15) << std::fixed << std::setprecision(6)
               << gn_result.final_error << std::setw(15) << std::fixed << std::setprecision(1) << gn_speedup << "x"
               << std::endl;
 
-    std::cout << std::setw(25) << "Levenberg-Marquardt" << std::setw(15) << lm_result.iterations << std::setw(15)
+    std::cout << std::setw(30) << "Levenberg-Marquardt" << std::setw(15) << lm_result.iterations << std::setw(15)
               << std::fixed << std::setprecision(3) << lm_time_ms << std::setw(15) << std::fixed << std::setprecision(6)
               << lm_result.final_error << std::setw(15) << std::fixed << std::setprecision(1) << lm_speedup << "x"
               << std::endl;
 
-    std::cout << std::setw(25) << "Optinum GaussNewton" << std::setw(15) << og_result.iterations << std::setw(15)
+    std::cout << std::setw(30) << "Optinum GaussNewton" << std::setw(15) << og_result.iterations << std::setw(15)
               << std::fixed << std::setprecision(3) << og_time_ms << std::setw(15) << std::fixed << std::setprecision(6)
               << og_result.final_error << std::setw(15) << std::fixed << std::setprecision(1) << og_speedup << "x"
               << std::endl;
 
+    std::cout << std::setw(30) << "Optinum LevenbergMarquardt" << std::setw(15) << olm_result.iterations
+              << std::setw(15) << std::fixed << std::setprecision(3) << olm_time_ms << std::setw(15) << std::fixed
+              << std::setprecision(6) << olm_result.final_error << std::setw(15) << std::fixed << std::setprecision(1)
+              << olm_speedup << "x" << std::endl;
+
+    std::cout << std::setw(30) << "Optinum GradientDescent (Adam)" << std::setw(15) << ogd_result.iterations
+              << std::setw(15) << std::fixed << std::setprecision(3) << ogd_time_ms << std::setw(15) << std::fixed
+              << std::setprecision(6) << ogd_result.final_error << std::setw(15) << std::fixed << std::setprecision(1)
+              << ogd_speedup << "x" << std::endl;
+
     std::cout << std::endl;
 
     std::cout << "=== Summary ===" << std::endl;
-    std::cout << "- Gauss-Newton converges in " << (gd_result.iterations / gn_result.iterations) << "x fewer iterations"
-              << std::endl;
-    std::cout << "- Levenberg-Marquardt converges in " << (gd_result.iterations / lm_result.iterations)
+    std::cout << "- Gauss-Newton converges in " << (gd_result.iterations / std::max(1, gn_result.iterations))
+              << "x fewer iterations" << std::endl;
+    std::cout << "- Levenberg-Marquardt converges in " << (gd_result.iterations / std::max(1, lm_result.iterations))
               << "x fewer iterations" << std::endl;
     std::cout << "- Gauss-Newton is " << std::fixed << std::setprecision(1) << gn_speedup
               << "x faster than gradient descent" << std::endl;
     std::cout << "- Levenberg-Marquardt is " << std::fixed << std::setprecision(1) << lm_speedup
               << "x faster than gradient descent" << std::endl;
     std::cout << "- Optinum GaussNewton is " << std::fixed << std::setprecision(1) << og_speedup
+              << "x faster than gradient descent" << std::endl;
+    std::cout << "- Optinum LevenbergMarquardt is " << std::fixed << std::setprecision(1) << olm_speedup
               << "x faster than gradient descent" << std::endl;
     std::cout << "- All methods achieve similar final accuracy" << std::endl;
     std::cout << "- LM offers best balance of speed and robustness for SLAM!" << std::endl;
