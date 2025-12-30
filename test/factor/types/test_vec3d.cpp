@@ -1,4 +1,4 @@
-#include "doctest.h"
+#include <doctest/doctest.h>
 #include "graphix/factor/types/vec3d.hpp"
 #include <cmath>
 

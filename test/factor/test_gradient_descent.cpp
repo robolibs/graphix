@@ -1,4 +1,4 @@
-#include "doctest.h"
+#include <doctest/doctest.h>
 #include "graphix/factor/graph.hpp"
 #include "graphix/factor/nonlinear/between_factor.hpp"
 #include "graphix/factor/nonlinear/gradient_descent.hpp"

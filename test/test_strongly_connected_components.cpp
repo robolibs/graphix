@@ -1,5 +1,5 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include <doctest/doctest.h>
 #include "graphix/vertex/algorithms/strongly_connected_components.hpp"
 #include "graphix/vertex/graph.hpp"
 
