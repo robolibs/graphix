@@ -3,6 +3,7 @@
 #include "graphix/factor/factor.hpp"
 #include "graphix/factor/linear/gaussian_factor.hpp"
 #include "graphix/factor/loss_function.hpp"
+#include "graphix/factor/types.hpp"
 #include "graphix/factor/values.hpp"
 
 #include <datapod/matrix.hpp>
@@ -98,18 +99,38 @@ namespace graphix::factor {
                     Values perturbed = values;
 
                     // Perturb this dimension
-                    // We need to handle different types (double, vector3d, etc.)
+                    // We need to handle different types (double, SE2d, vector3d, etc.)
                     if (var_dim == 1) {
                         // Scalar variable
                         double x = values.at<double>(key);
                         perturbed.erase(key);
                         perturbed.insert(key, x + epsilon);
                     } else if (var_dim == 3) {
-                        // vector3d variable
-                        dp::mat::vector3d x = values.at<dp::mat::vector3d>(key);
-                        x[j] += epsilon;
-                        perturbed.erase(key);
-                        perturbed.insert(key, x);
+                        // Try SE2d first (manifold perturbation via exp map)
+                        bool handled = false;
+                        try {
+                            SE2d pose = values.at<SE2d>(key);
+                            // Create tangent perturbation with epsilon at position j
+                            SE2d::Tangent delta;
+                            delta[0] = (j == 0) ? epsilon : 0.0;
+                            delta[1] = (j == 1) ? epsilon : 0.0;
+                            delta[2] = (j == 2) ? epsilon : 0.0;
+                            // Left perturbation: exp(delta) * pose
+                            SE2d perturbed_pose = SE2d::exp(delta) * pose;
+                            perturbed.erase(key);
+                            perturbed.insert(key, perturbed_pose);
+                            handled = true;
+                        } catch (...) {
+                            // Not an SE2d, fall through to vector3d
+                        }
+
+                        if (!handled) {
+                            // Fall back to vector3d (for backward compatibility)
+                            dp::mat::vector3d x = values.at<dp::mat::vector3d>(key);
+                            x[j] += epsilon;
+                            perturbed.erase(key);
+                            perturbed.insert(key, x);
+                        }
                     } else {
                         throw std::runtime_error("Unsupported variable dimension in linearize()");
                     }
