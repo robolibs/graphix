@@ -1,6 +1,6 @@
-#include "doctest.cpp"
 #include "graphix/vertex/graph.hpp"
 #include <cstdio>
+#include <doctest/doctest.h>
 #include <fstream>
 #include <sstream>
 
