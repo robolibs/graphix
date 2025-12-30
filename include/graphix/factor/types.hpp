@@ -20,6 +20,7 @@
 #include <datapod/sequential.hpp>
 #include <datapod/trees.hpp>
 
+#include <optinum/lie/groups/se2.hpp>
 #include <optinum/lina/solve/solve_dynamic.hpp>
 #include <optinum/simd/matrix.hpp>
 #include <optinum/simd/vector.hpp>
@@ -35,6 +36,15 @@ namespace graphix::factor {
 
     using Vec3d = dp::mat::vector3d;
     using Vec3f = dp::mat::vector3f;
+
+    // =========================================================================
+    // Lie group types (from optinum::lie)
+    // =========================================================================
+
+    using SE2d = on::lie::SE2<double>;
+    using SE2f = on::lie::SE2<float>;
+    using SO2d = on::lie::SO2<double>;
+    using SO2f = on::lie::SO2<float>;
 
     // =========================================================================
     // Dynamic-size vector types (data storage from datapod::mat)
@@ -154,6 +164,10 @@ namespace graphix::factor {
      * @param a Matrix (m x n)
      * @param x Vector (n elements)
      * @return Result vector (m elements)
+     *
+     * @note Uses manual loop for dynamic matrices. optinum's SIMD matmul_to()
+     *       only supports fixed-size matrices. Consider adding runtime SIMD
+     *       version to optinum for better performance with large dynamic matrices.
      */
     inline DynVec matmul(const DynMat &a, const DynVec &x) {
         const std::size_t m = a.rows();
@@ -161,13 +175,15 @@ namespace graphix::factor {
 
         DynVec result(m);
 
-        // Manual matrix-vector multiplication (column-major layout)
+        // Column-major layout: accumulate column contributions
         for (std::size_t i = 0; i < m; ++i) {
-            double sum = 0.0;
-            for (std::size_t j = 0; j < n; ++j) {
-                sum += a(i, j) * x[j];
+            result[i] = 0.0;
+        }
+        for (std::size_t j = 0; j < n; ++j) {
+            const double xj = x[j];
+            for (std::size_t i = 0; i < m; ++i) {
+                result[i] += a(i, j) * xj;
             }
-            result[i] = sum;
         }
 
         return result;
@@ -179,6 +195,9 @@ namespace graphix::factor {
      * @param a Matrix (m x k)
      * @param b Matrix (k x n)
      * @return Result matrix (m x n)
+     *
+     * @note Uses manual loop for dynamic matrices. optinum's SIMD matmul_to()
+     *       only supports fixed-size matrices.
      */
     inline DynMat matmul(const DynMat &a, const DynMat &b) {
         const std::size_t m = a.rows();
@@ -187,14 +206,18 @@ namespace graphix::factor {
 
         DynMat result(m, n);
 
-        // Manual matrix multiplication (column-major layout)
+        // Column-major GEMM: C(:,j) = A * B(:,j)
         for (std::size_t j = 0; j < n; ++j) {
+            // Initialize column j of result to zero
             for (std::size_t i = 0; i < m; ++i) {
-                double sum = 0.0;
-                for (std::size_t p = 0; p < k; ++p) {
-                    sum += a(i, p) * b(p, j);
+                result(i, j) = 0.0;
+            }
+            // Accumulate: result(:,j) += a(:,p) * b(p,j)
+            for (std::size_t p = 0; p < k; ++p) {
+                const double bpj = b(p, j);
+                for (std::size_t i = 0; i < m; ++i) {
+                    result(i, j) += a(i, p) * bpj;
                 }
-                result(i, j) = sum;
             }
         }
 
@@ -206,6 +229,9 @@ namespace graphix::factor {
      *
      * @param a Matrix (m x n)
      * @return Transposed matrix (n x m)
+     *
+     * @note Uses manual loop for dynamic matrices. optinum's SIMD transpose_to()
+     *       only supports fixed-size matrices.
      */
     inline DynMat transpose(const DynMat &a) {
         const std::size_t m = a.rows();
@@ -213,8 +239,9 @@ namespace graphix::factor {
 
         DynMat result(n, m);
 
-        for (std::size_t i = 0; i < m; ++i) {
-            for (std::size_t j = 0; j < n; ++j) {
+        // Transpose: result(j,i) = a(i,j)
+        for (std::size_t j = 0; j < n; ++j) {
+            for (std::size_t i = 0; i < m; ++i) {
                 result(j, i) = a(i, j);
             }
         }
