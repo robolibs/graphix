@@ -44,7 +44,7 @@ namespace graphix::factor {
          * - jacobians[i] is m × dim(key[i]) matrix
          * - b is m-dimensional vector
          *
-         * Example: Vec3BetweenFactor(pose_i, pose_j) with 3D error:
+         * Example: SE2BetweenFactor(pose_i, pose_j) with 3D error:
          * - keys = {pose_i, pose_j}
          * - jacobians[0] = 3×3 matrix (∂error/∂pose_i)
          * - jacobians[1] = 3×3 matrix (∂error/∂pose_j)
