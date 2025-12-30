@@ -2,9 +2,9 @@
 
 #include "graphix/factor/graph.hpp"
 #include "graphix/factor/nonlinear/nonlinear_factor.hpp"
-#include "graphix/factor/types/vec3d.hpp"
 #include "graphix/factor/values.hpp"
 #include <cmath>
+#include <datapod/matrix.hpp>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -14,8 +14,8 @@
 namespace graphix::factor {
 
     namespace detail {
-        // Type to store gradient for either double or Vec3d
-        using GradientValue = std::variant<double, Vec3d>;
+        // Type to store gradient for either double or datapod::mat::vector3d
+        using GradientValue = std::variant<double, datapod::mat::vector3d>;
 
         // Helper class to compute and cache gradients
         class GradientCache {
@@ -28,9 +28,9 @@ namespace graphix::factor {
                 norm += grad * grad;
             }
 
-            inline void add_vec3_gradient(Key key, const Vec3d &grad) {
+            inline void add_vec3_gradient(Key key, const datapod::mat::vector3d &grad) {
                 gradients[key] = grad;
-                norm += grad.norm_squared();
+                norm += grad[0] * grad[0] + grad[1] * grad[1] + grad[2] * grad[2];
             }
 
             inline void finalize() { norm = std::sqrt(norm); }
@@ -69,17 +69,17 @@ namespace graphix::factor {
                     m[key] = m_val;
                     v[key] = v_val;
 
-                } else if (std::holds_alternative<Vec3d>(grad)) {
-                    Vec3d g = std::get<Vec3d>(grad);
+                } else if (std::holds_alternative<datapod::mat::vector3d>(grad)) {
+                    datapod::mat::vector3d g = std::get<datapod::mat::vector3d>(grad);
 
                     // Initialize if needed
                     if (m.find(key) == m.end()) {
-                        m[key] = Vec3d(0, 0, 0);
-                        v[key] = Vec3d(0, 0, 0);
+                        m[key] = datapod::mat::vector3d{0, 0, 0};
+                        v[key] = datapod::mat::vector3d{0, 0, 0};
                     }
 
-                    Vec3d m_val = std::get<Vec3d>(m[key]);
-                    Vec3d v_val = std::get<Vec3d>(v[key]);
+                    datapod::mat::vector3d m_val = std::get<datapod::mat::vector3d>(m[key]);
+                    datapod::mat::vector3d v_val = std::get<datapod::mat::vector3d>(v[key]);
 
                     // Update biased moments (element-wise)
                     for (int i = 0; i < 3; i++) {
@@ -109,10 +109,10 @@ namespace graphix::factor {
                     return m_hat / (std::sqrt(v_hat) + epsilon);
 
                 } else {
-                    Vec3d m_val = std::get<Vec3d>(m.at(key));
-                    Vec3d v_val = std::get<Vec3d>(v.at(key));
+                    datapod::mat::vector3d m_val = std::get<datapod::mat::vector3d>(m.at(key));
+                    datapod::mat::vector3d v_val = std::get<datapod::mat::vector3d>(v.at(key));
 
-                    Vec3d update;
+                    datapod::mat::vector3d update;
                     for (int i = 0; i < 3; i++) {
                         double m_hat = m_val[i] / bias_correction1;
                         double v_hat = v_val[i] / bias_correction2;
@@ -158,15 +158,15 @@ namespace graphix::factor {
                     cache.add_scalar_gradient(key, grad);
 
                 } catch (const std::runtime_error &) {
-                    // Try Vec3d
+                    // Try datapod::mat::vector3d
                     try {
-                        Vec3d vec = values.at<Vec3d>(key);
-                        Vec3d grad(0.0, 0.0, 0.0);
+                        datapod::mat::vector3d vec = values.at<datapod::mat::vector3d>(key);
+                        datapod::mat::vector3d grad{0.0, 0.0, 0.0};
 
                         // Compute gradient for each dimension
                         for (int dim = 0; dim < 3; ++dim) {
-                            Vec3d vec_plus = vec;
-                            Vec3d vec_minus = vec;
+                            datapod::mat::vector3d vec_plus = vec;
+                            datapod::mat::vector3d vec_minus = vec;
 
                             vec_plus[dim] += h;
                             vec_minus[dim] -= h;
@@ -219,11 +219,15 @@ namespace graphix::factor {
                     updated.erase(key);
                     updated.insert(key, x - step_size * u);
 
-                } else if (std::holds_alternative<Vec3d>(update)) {
-                    Vec3d vec = current.at<Vec3d>(key);
-                    Vec3d u = std::get<Vec3d>(update);
+                } else if (std::holds_alternative<datapod::mat::vector3d>(update)) {
+                    datapod::mat::vector3d vec = current.at<datapod::mat::vector3d>(key);
+                    datapod::mat::vector3d u = std::get<datapod::mat::vector3d>(update);
                     updated.erase(key);
-                    updated.insert(key, vec - u * step_size);
+                    datapod::mat::vector3d result;
+                    for (int i = 0; i < 3; ++i) {
+                        result[i] = vec[i] - u[i] * step_size;
+                    }
+                    updated.insert(key, result);
                 }
             }
 
@@ -241,11 +245,15 @@ namespace graphix::factor {
                     updated.erase(key);
                     updated.insert(key, x - step_size * grad);
 
-                } else if (std::holds_alternative<Vec3d>(grad_val)) {
-                    Vec3d vec = current.at<Vec3d>(key);
-                    Vec3d grad = std::get<Vec3d>(grad_val);
+                } else if (std::holds_alternative<datapod::mat::vector3d>(grad_val)) {
+                    datapod::mat::vector3d vec = current.at<datapod::mat::vector3d>(key);
+                    datapod::mat::vector3d grad = std::get<datapod::mat::vector3d>(grad_val);
                     updated.erase(key);
-                    updated.insert(key, vec - grad * step_size);
+                    datapod::mat::vector3d result;
+                    for (int i = 0; i < 3; ++i) {
+                        result[i] = vec[i] - grad[i] * step_size;
+                    }
+                    updated.insert(key, result);
                 }
             }
 

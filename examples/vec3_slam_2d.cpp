@@ -13,6 +13,7 @@
 #include "graphix/factor/nonlinear/gradient_descent.hpp"
 #include "graphix/factor/nonlinear/vec3_between_factor.hpp"
 #include "graphix/factor/nonlinear/vec3_prior_factor.hpp"
+#include "graphix/factor/types.hpp"
 #include "graphix/kernel.hpp"
 #include <cmath>
 #include <iomanip>
@@ -24,9 +25,9 @@ using namespace graphix::factor;
 // Helper function to print a pose
 void print_pose(const std::string &label, const Vec3d &pose) {
     std::cout << std::setw(12) << label << ": "
-              << "x=" << std::setw(7) << std::fixed << std::setprecision(3) << pose.x() << ", "
-              << "y=" << std::setw(7) << std::fixed << std::setprecision(3) << pose.y() << ", "
-              << "θ=" << std::setw(7) << std::fixed << std::setprecision(3) << pose.z() * 180.0 / M_PI << "°"
+              << "x=" << std::setw(7) << std::fixed << std::setprecision(3) << pose[0] << ", "
+              << "y=" << std::setw(7) << std::fixed << std::setprecision(3) << pose[1] << ", "
+              << "θ=" << std::setw(7) << std::fixed << std::setprecision(3) << pose[2] * 180.0 / M_PI << "°"
               << std::endl;
 }
 
@@ -54,15 +55,15 @@ int main() {
     // X8: (0, 0, 0°)    - Turn left 90°, facing original direction
 
     std::cout << "Ground Truth Trajectory (square path):" << std::endl;
-    Vec3d gt_x0(0.0, 0.0, 0.0);
-    Vec3d gt_x1(2.0, 0.0, 0.0);
-    Vec3d gt_x2(2.0, 0.0, M_PI / 2);
-    Vec3d gt_x3(2.0, 2.0, M_PI / 2);
-    Vec3d gt_x4(2.0, 2.0, M_PI);
-    Vec3d gt_x5(0.0, 2.0, M_PI);
-    Vec3d gt_x6(0.0, 2.0, 3 * M_PI / 2);
-    Vec3d gt_x7(0.0, 0.0, 3 * M_PI / 2);
-    Vec3d gt_x8(0.0, 0.0, 2 * M_PI);
+    Vec3d gt_x0{0.0, 0.0, 0.0};
+    Vec3d gt_x1{2.0, 0.0, 0.0};
+    Vec3d gt_x2{2.0, 0.0, M_PI / 2};
+    Vec3d gt_x3{2.0, 2.0, M_PI / 2};
+    Vec3d gt_x4{2.0, 2.0, M_PI};
+    Vec3d gt_x5{0.0, 2.0, M_PI};
+    Vec3d gt_x6{0.0, 2.0, 3 * M_PI / 2};
+    Vec3d gt_x7{0.0, 0.0, 3 * M_PI / 2};
+    Vec3d gt_x8{0.0, 0.0, 2 * M_PI};
 
     print_pose("X0 (start)", gt_x0);
     print_pose("X1", gt_x1);
@@ -82,46 +83,46 @@ int main() {
     Graph<NonlinearFactor> graph;
 
     // Prior on starting pose (we know where we started)
-    Vec3d prior_sigma(0.01, 0.01, 0.01); // Very confident about start
+    Vec3d prior_sigma{0.01, 0.01, 0.01}; // Very confident about start
     graph.add(std::make_shared<Vec3PriorFactor>(X(0), gt_x0, prior_sigma));
 
     // Odometry measurements (translation then rotation pattern)
-    Vec3d odom_sigma(0.1, 0.1, 0.05); // More confident in rotation than translation
+    Vec3d odom_sigma{0.1, 0.1, 0.05}; // More confident in rotation than translation
 
     // Odometry has slight systematic bias (drift)
     double translation_bias = 0.05; // Overestimate distance by 5cm each time
     double rotation_bias = -0.02;   // Underestimate rotation by ~1.1°
 
     // X0 → X1: Move forward 2m (with bias: measures 2.05m)
-    Vec3d odom_0_1(2.0 + translation_bias, 0.0, 0.0);
+    Vec3d odom_0_1{2.0 + translation_bias, 0.0, 0.0};
     graph.add(std::make_shared<Vec3BetweenFactor>(X(0), X(1), odom_0_1, odom_sigma));
 
     // X1 → X2: Turn left 90° (with bias: measures ~88.9°)
-    Vec3d odom_1_2(0.0, 0.0, M_PI / 2 + rotation_bias);
+    Vec3d odom_1_2{0.0, 0.0, M_PI / 2 + rotation_bias};
     graph.add(std::make_shared<Vec3BetweenFactor>(X(1), X(2), odom_1_2, odom_sigma));
 
     // X2 → X3: Move forward 2m (with bias: measures 2.05m)
-    Vec3d odom_2_3(2.0 + translation_bias, 0.0, 0.0);
+    Vec3d odom_2_3{2.0 + translation_bias, 0.0, 0.0};
     graph.add(std::make_shared<Vec3BetweenFactor>(X(2), X(3), odom_2_3, odom_sigma));
 
     // X3 → X4: Turn left 90°
-    Vec3d odom_3_4(0.0, 0.0, M_PI / 2 + rotation_bias);
+    Vec3d odom_3_4{0.0, 0.0, M_PI / 2 + rotation_bias};
     graph.add(std::make_shared<Vec3BetweenFactor>(X(3), X(4), odom_3_4, odom_sigma));
 
     // X4 → X5: Move forward 2m
-    Vec3d odom_4_5(2.0 + translation_bias, 0.0, 0.0);
+    Vec3d odom_4_5{2.0 + translation_bias, 0.0, 0.0};
     graph.add(std::make_shared<Vec3BetweenFactor>(X(4), X(5), odom_4_5, odom_sigma));
 
     // X5 → X6: Turn left 90°
-    Vec3d odom_5_6(0.0, 0.0, M_PI / 2 + rotation_bias);
+    Vec3d odom_5_6{0.0, 0.0, M_PI / 2 + rotation_bias};
     graph.add(std::make_shared<Vec3BetweenFactor>(X(5), X(6), odom_5_6, odom_sigma));
 
     // X6 → X7: Move forward 2m
-    Vec3d odom_6_7(2.0 + translation_bias, 0.0, 0.0);
+    Vec3d odom_6_7{2.0 + translation_bias, 0.0, 0.0};
     graph.add(std::make_shared<Vec3BetweenFactor>(X(6), X(7), odom_6_7, odom_sigma));
 
     // X7 → X8: Turn left 90°
-    Vec3d odom_7_8(0.0, 0.0, M_PI / 2 + rotation_bias);
+    Vec3d odom_7_8{0.0, 0.0, M_PI / 2 + rotation_bias};
     graph.add(std::make_shared<Vec3BetweenFactor>(X(7), X(8), odom_7_8, odom_sigma));
 
     std::cout << "Factor graph constructed with " << graph.size() << " factors:" << std::endl;
@@ -143,15 +144,15 @@ int main() {
     if (use_ground_truth_init) {
         // Start very close to solution to test optimizer
         std::cout << "Using ground truth with small noise as initial guess" << std::endl;
-        initial.insert(X(0), gt_x0 + Vec3d(0.05, 0.05, 0.01));
-        initial.insert(X(1), gt_x1 + Vec3d(-0.03, 0.04, -0.01));
-        initial.insert(X(2), gt_x2 + Vec3d(0.04, -0.02, 0.02));
-        initial.insert(X(3), gt_x3 + Vec3d(-0.02, 0.03, -0.01));
-        initial.insert(X(4), gt_x4 + Vec3d(0.03, -0.04, 0.01));
-        initial.insert(X(5), gt_x5 + Vec3d(-0.04, 0.02, -0.02));
-        initial.insert(X(6), gt_x6 + Vec3d(0.02, -0.03, 0.01));
-        initial.insert(X(7), gt_x7 + Vec3d(-0.01, 0.04, -0.01));
-        initial.insert(X(8), gt_x8 + Vec3d(0.03, -0.02, 0.02));
+        initial.insert(X(0), Vec3d{gt_x0[0] + 0.05, gt_x0[1] + 0.05, gt_x0[2] + 0.01});
+        initial.insert(X(1), Vec3d{gt_x1[0] - 0.03, gt_x1[1] + 0.04, gt_x1[2] - 0.01});
+        initial.insert(X(2), Vec3d{gt_x2[0] + 0.04, gt_x2[1] - 0.02, gt_x2[2] + 0.02});
+        initial.insert(X(3), Vec3d{gt_x3[0] - 0.02, gt_x3[1] + 0.03, gt_x3[2] - 0.01});
+        initial.insert(X(4), Vec3d{gt_x4[0] + 0.03, gt_x4[1] - 0.04, gt_x4[2] + 0.01});
+        initial.insert(X(5), Vec3d{gt_x5[0] - 0.04, gt_x5[1] + 0.02, gt_x5[2] - 0.02});
+        initial.insert(X(6), Vec3d{gt_x6[0] + 0.02, gt_x6[1] - 0.03, gt_x6[2] + 0.01});
+        initial.insert(X(7), Vec3d{gt_x7[0] - 0.01, gt_x7[1] + 0.04, gt_x7[2] - 0.01});
+        initial.insert(X(8), Vec3d{gt_x8[0] + 0.03, gt_x8[1] - 0.02, gt_x8[2] + 0.02});
     } else {
         // Odometry integration (more realistic)
         std::cout << "Using odometry integration as initial guess" << std::endl;
@@ -161,43 +162,43 @@ int main() {
         Vec3d current_pose = gt_x0;
 
         // X0 → X1: Move forward in current direction
-        double dx1 = odom_0_1.x() * cos(current_pose.z());
-        double dy1 = odom_0_1.x() * sin(current_pose.z());
-        current_pose = Vec3d(current_pose.x() + dx1, current_pose.y() + dy1, current_pose.z());
+        double dx1 = odom_0_1[0] * cos(current_pose[2]);
+        double dy1 = odom_0_1[0] * sin(current_pose[2]);
+        current_pose = Vec3d{current_pose[0] + dx1, current_pose[1] + dy1, current_pose[2]};
         initial.insert(X(1), current_pose);
 
         // X1 → X2: Rotate
-        current_pose = Vec3d(current_pose.x(), current_pose.y(), current_pose.z() + odom_1_2.z());
+        current_pose = Vec3d{current_pose[0], current_pose[1], current_pose[2] + odom_1_2[2]};
         initial.insert(X(2), current_pose);
 
         // X2 → X3: Move forward
-        double dx3 = odom_2_3.x() * cos(current_pose.z());
-        double dy3 = odom_2_3.x() * sin(current_pose.z());
-        current_pose = Vec3d(current_pose.x() + dx3, current_pose.y() + dy3, current_pose.z());
+        double dx3 = odom_2_3[0] * cos(current_pose[2]);
+        double dy3 = odom_2_3[0] * sin(current_pose[2]);
+        current_pose = Vec3d{current_pose[0] + dx3, current_pose[1] + dy3, current_pose[2]};
         initial.insert(X(3), current_pose);
 
         // X3 → X4: Rotate
-        current_pose = Vec3d(current_pose.x(), current_pose.y(), current_pose.z() + odom_3_4.z());
+        current_pose = Vec3d{current_pose[0], current_pose[1], current_pose[2] + odom_3_4[2]};
         initial.insert(X(4), current_pose);
 
         // X4 → X5: Move forward
-        double dx5 = odom_4_5.x() * cos(current_pose.z());
-        double dy5 = odom_4_5.x() * sin(current_pose.z());
-        current_pose = Vec3d(current_pose.x() + dx5, current_pose.y() + dy5, current_pose.z());
+        double dx5 = odom_4_5[0] * cos(current_pose[2]);
+        double dy5 = odom_4_5[0] * sin(current_pose[2]);
+        current_pose = Vec3d{current_pose[0] + dx5, current_pose[1] + dy5, current_pose[2]};
         initial.insert(X(5), current_pose);
 
         // X5 → X6: Rotate
-        current_pose = Vec3d(current_pose.x(), current_pose.y(), current_pose.z() + odom_5_6.z());
+        current_pose = Vec3d{current_pose[0], current_pose[1], current_pose[2] + odom_5_6[2]};
         initial.insert(X(6), current_pose);
 
         // X6 → X7: Move forward
-        double dx7 = odom_6_7.x() * cos(current_pose.z());
-        double dy7 = odom_6_7.x() * sin(current_pose.z());
-        current_pose = Vec3d(current_pose.x() + dx7, current_pose.y() + dy7, current_pose.z());
+        double dx7 = odom_6_7[0] * cos(current_pose[2]);
+        double dy7 = odom_6_7[0] * sin(current_pose[2]);
+        current_pose = Vec3d{current_pose[0] + dx7, current_pose[1] + dy7, current_pose[2]};
         initial.insert(X(7), current_pose);
 
         // X7 → X8: Rotate
-        current_pose = Vec3d(current_pose.x(), current_pose.y(), current_pose.z() + odom_7_8.z());
+        current_pose = Vec3d{current_pose[0], current_pose[1], current_pose[2] + odom_7_8[2]};
         initial.insert(X(8), current_pose);
     }
 
@@ -249,13 +250,13 @@ int main() {
     // Check loop closure error
     Vec3d final_pose_no_loop = result_no_loop.values.at<Vec3d>(X(8));
     Vec3d start_pose = result_no_loop.values.at<Vec3d>(X(0));
-    Vec3d loop_error_no_loop = final_pose_no_loop - start_pose;
+    double loop_dx = final_pose_no_loop[0] - start_pose[0];
+    double loop_dy = final_pose_no_loop[1] - start_pose[1];
+    double loop_dtheta = final_pose_no_loop[2] - start_pose[2];
+    Vec3d loop_error_no_loop{loop_dx, loop_dy, loop_dtheta};
     std::cout << "\nLoop closure error (X8 - X0):" << std::endl;
     print_pose("  Error", loop_error_no_loop);
-    std::cout << "  Distance: "
-              << std::sqrt(loop_error_no_loop.x() * loop_error_no_loop.x() +
-                           loop_error_no_loop.y() * loop_error_no_loop.y())
-              << " meters" << std::endl;
+    std::cout << "  Distance: " << std::sqrt(loop_dx * loop_dx + loop_dy * loop_dy) << " meters" << std::endl;
     std::cout << std::endl;
 
     // ========================================
@@ -266,8 +267,8 @@ int main() {
 
     // Loop closure: We observe that X8 is very close to X0 (same position, same orientation)
     // This is a powerful constraint that will distribute the accumulated error
-    Vec3d loop_closure_measurement(0.0, 0.0, 2 * M_PI); // X8 should equal X0 + full rotation
-    Vec3d loop_closure_sigma(0.15, 0.15, 0.1);          // Slightly less confident than prior
+    Vec3d loop_closure_measurement{0.0, 0.0, 2 * M_PI}; // X8 should equal X0 + full rotation
+    Vec3d loop_closure_sigma{0.15, 0.15, 0.1};          // Slightly less confident than prior
 
     auto loop_closure_factor =
         std::make_shared<Vec3BetweenFactor>(X(0), X(8), loop_closure_measurement, loop_closure_sigma);
@@ -300,13 +301,13 @@ int main() {
     // Check loop closure error
     Vec3d final_pose_with_loop = result_with_loop.values.at<Vec3d>(X(8));
     Vec3d start_pose_final = result_with_loop.values.at<Vec3d>(X(0));
-    Vec3d loop_error_with_loop = final_pose_with_loop - start_pose_final;
+    double loop_dx2 = final_pose_with_loop[0] - start_pose_final[0];
+    double loop_dy2 = final_pose_with_loop[1] - start_pose_final[1];
+    double loop_dtheta2 = final_pose_with_loop[2] - start_pose_final[2];
+    Vec3d loop_error_with_loop{loop_dx2, loop_dy2, loop_dtheta2};
     std::cout << "\nLoop closure error (X8 - X0):" << std::endl;
     print_pose("  Error", loop_error_with_loop);
-    std::cout << "  Distance: "
-              << std::sqrt(loop_error_with_loop.x() * loop_error_with_loop.x() +
-                           loop_error_with_loop.y() * loop_error_with_loop.y())
-              << " meters" << std::endl;
+    std::cout << "  Distance: " << std::sqrt(loop_dx2 * loop_dx2 + loop_dy2 * loop_dy2) << " meters" << std::endl;
     std::cout << std::endl;
 
     // ========================================
@@ -325,10 +326,12 @@ int main() {
     for (size_t i = 0; i < 9; i++) {
         Vec3d optimized = result_with_loop.values.at<Vec3d>(X(i));
         Vec3d gt = ground_truth[i];
-        Vec3d error = optimized - gt;
+        double err_x = optimized[0] - gt[0];
+        double err_y = optimized[1] - gt[1];
+        double err_theta = optimized[2] - gt[2];
 
-        double pos_error = std::sqrt(error.x() * error.x() + error.y() * error.y());
-        double angle_error = std::abs(error.z()) * 180.0 / M_PI;
+        double pos_error = std::sqrt(err_x * err_x + err_y * err_y);
+        double angle_error = std::abs(err_theta) * 180.0 / M_PI;
 
         total_position_error += pos_error;
         total_angle_error += angle_error;
@@ -344,11 +347,11 @@ int main() {
     std::cout << std::endl;
 
     std::cout << "=== Summary ===" << std::endl;
-    std::cout << "✓ Demonstrated 2D SLAM with Vec3d representing poses (x, y, θ)" << std::endl;
-    std::cout << "✓ Odometry drift accumulated without loop closure" << std::endl;
-    std::cout << "✓ Loop closure constraint distributed error across trajectory" << std::endl;
-    std::cout << "✓ Gradient descent successfully optimized the factor graph" << std::endl;
-    std::cout << "✓ Final trajectory close to ground truth square path" << std::endl;
+    std::cout << "Demonstrated 2D SLAM with Vec3d representing poses (x, y, theta)" << std::endl;
+    std::cout << "Odometry drift accumulated without loop closure" << std::endl;
+    std::cout << "Loop closure constraint distributed error across trajectory" << std::endl;
+    std::cout << "Gradient descent successfully optimized the factor graph" << std::endl;
+    std::cout << "Final trajectory close to ground truth square path" << std::endl;
 
     return 0;
 }

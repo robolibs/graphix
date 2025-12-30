@@ -1,12 +1,16 @@
 #pragma once
 
 #include "graphix/factor/factor.hpp"
-#include "graphix/factor/linear/matrix.hpp"
 #include "graphix/kernel.hpp"
+
+#include <datapod/matrix.hpp>
+#include <datapod/sequential.hpp>
+
 #include <map>
-#include <vector>
 
 namespace graphix::factor {
+
+    namespace dp = ::datapod;
 
     /**
      * @brief Gaussian factor - linearized version of a nonlinear factor
@@ -26,6 +30,9 @@ namespace graphix::factor {
      */
     class GaussianFactor : public Factor {
       public:
+        using Matrix = dp::mat::MatrixXd;
+        using Vector = dp::mat::VectorXd;
+
         /**
          * @brief Construct a Gaussian factor
          *
@@ -43,12 +50,11 @@ namespace graphix::factor {
          * - jacobians[1] = 3×3 matrix (∂error/∂pose_j)
          * - b = 3D error vector
          */
-        inline GaussianFactor(const std::vector<Key> &keys, const std::vector<Matrix> &jacobians,
-                              const std::vector<double> &b)
+        inline GaussianFactor(const dp::Vector<Key> &keys, const dp::Vector<Matrix> &jacobians, const Vector &b)
             : Factor(), jacobians_(jacobians), b_(b) {
             // Copy keys to parent
-            for (Key key : keys) {
-                m_keys.push_back(key);
+            for (std::size_t i = 0; i < keys.size(); ++i) {
+                m_keys.push_back(keys[i]);
             }
 
             if (keys.size() != jacobians.size()) {
@@ -56,14 +62,14 @@ namespace graphix::factor {
             }
 
             // Build key index map
-            for (size_t i = 0; i < keys.size(); ++i) {
+            for (std::size_t i = 0; i < keys.size(); ++i) {
                 key_index_[keys[i]] = i;
             }
 
             // Validate dimensions
-            if (!jacobians.empty() && !b.empty()) {
-                size_t error_dim = b.size();
-                for (size_t i = 0; i < jacobians.size(); ++i) {
+            if (!jacobians.empty() && b.size() > 0) {
+                std::size_t error_dim = b.size();
+                for (std::size_t i = 0; i < jacobians.size(); ++i) {
                     if (jacobians[i].rows() != error_dim) {
                         throw std::invalid_argument("All Jacobians must have same number of rows as error vector");
                     }
@@ -89,17 +95,17 @@ namespace graphix::factor {
         /**
          * @brief Get all Jacobians in order of keys
          */
-        const std::vector<Matrix> &jacobians() const { return jacobians_; }
+        const dp::Vector<Matrix> &jacobians() const { return jacobians_; }
 
         /**
          * @brief Get error vector at linearization point
          */
-        const std::vector<double> &b() const { return b_; }
+        const Vector &b() const { return b_; }
 
         /**
          * @brief Get dimension of error (size of error vector)
          */
-        size_t dim() const { return b_.size(); }
+        std::size_t dim() const { return b_.size(); }
 
         /**
          * @brief Compute weighted squared error for given delta
@@ -109,51 +115,53 @@ namespace graphix::factor {
          * @param deltas Map from Key to delta vector for each variable
          * @return Weighted squared error
          */
-        inline double error(const std::map<Key, std::vector<double>> &deltas) const {
+        inline double error(const std::map<Key, Vector> &deltas) const {
             // Compute: 0.5 * ||A * dx + b||²
 
-            // Start with b
-            std::vector<double> residual = b_;
+            // Start with b (copy)
+            Vector residual(b_.size());
+            for (std::size_t i = 0; i < b_.size(); ++i) {
+                residual[i] = b_[i];
+            }
 
             // Add A * dx for each variable
-            for (size_t i = 0; i < m_keys.size(); ++i) {
+            for (std::size_t i = 0; i < m_keys.size(); ++i) {
                 Key key = m_keys[i];
+                const Matrix &J = jacobians_[i];
 
                 // Get delta for this key (or zero if not in map)
-                std::vector<double> dx;
                 auto it = deltas.find(key);
                 if (it != deltas.end()) {
-                    dx = it->second;
-                } else {
-                    // Delta not provided, assume zero
-                    dx.resize(jacobians_[i].cols(), 0.0);
-                }
+                    const Vector &dx = it->second;
 
-                // Validate dimensions
-                if (dx.size() != jacobians_[i].cols()) {
-                    throw std::invalid_argument("Delta dimension mismatch for key");
-                }
+                    // Validate dimensions
+                    if (dx.size() != J.cols()) {
+                        throw std::invalid_argument("Delta dimension mismatch for key");
+                    }
 
-                // Add J_i * dx_i to residual
-                std::vector<double> J_dx = jacobians_[i] * dx;
-                for (size_t j = 0; j < residual.size(); ++j) {
-                    residual[j] += J_dx[j];
+                    // Add J * dx to residual (manual matrix-vector multiply)
+                    for (std::size_t row = 0; row < J.rows(); ++row) {
+                        for (std::size_t col = 0; col < J.cols(); ++col) {
+                            residual[row] += J(row, col) * dx[col];
+                        }
+                    }
                 }
+                // If delta not provided, assume zero (no contribution)
             }
 
             // Compute 0.5 * ||residual||²
             double sum_squared = 0.0;
-            for (double r : residual) {
-                sum_squared += r * r;
+            for (std::size_t i = 0; i < residual.size(); ++i) {
+                sum_squared += residual[i] * residual[i];
             }
 
             return 0.5 * sum_squared;
         }
 
       private:
-        std::vector<Matrix> jacobians_;   ///< Jacobian for each variable (in order of keys)
-        std::vector<double> b_;           ///< Error vector at linearization point
-        std::map<Key, size_t> key_index_; ///< Map from Key to index in jacobians_
+        dp::Vector<Matrix> jacobians_;         ///< Jacobian for each variable (in order of keys)
+        Vector b_;                             ///< Error vector at linearization point
+        std::map<Key, std::size_t> key_index_; ///< Map from Key to index in jacobians_
     };
 
 } // namespace graphix::factor

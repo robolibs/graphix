@@ -1,8 +1,8 @@
 #pragma once
 
 #include "graphix/factor/nonlinear/nonlinear_factor.hpp"
-#include "graphix/factor/types/vec3d.hpp"
 #include <cmath>
+#include <datapod/matrix.hpp>
 #include <stdexcept>
 
 namespace graphix::factor {
@@ -40,6 +40,8 @@ namespace graphix::factor {
      */
     class Vec3BetweenFactor : public NonlinearFactor {
       public:
+        using Vec3d = datapod::mat::vector3d;
+
         /**
          * @brief Construct between factor
          *
@@ -52,7 +54,7 @@ namespace graphix::factor {
             : NonlinearFactor({key_i, key_j}), measured_(measured), sigmas_(sigmas) {
 
             // Validate sigmas
-            if (sigmas.x() <= 0.0 || sigmas.y() <= 0.0 || sigmas.z() <= 0.0) {
+            if (sigmas_[0] <= 0.0 || sigmas_[1] <= 0.0 || sigmas_[2] <= 0.0) {
                 throw std::invalid_argument("All sigmas must be positive");
             }
         }
@@ -72,9 +74,9 @@ namespace graphix::factor {
 
             // Interpret Vec3d as 2D pose (x, y, theta).
             // Measurement is in the local frame of pose i (odometry-style).
-            const double theta_i = vi.z();
-            const double dx_world = vj.x() - vi.x();
-            const double dy_world = vj.y() - vi.y();
+            const double theta_i = vi[2];
+            const double dx_world = vj[0] - vi[0];
+            const double dy_world = vj[1] - vi[1];
 
             // Rotate world delta into i frame: R(-theta_i) * (t_j - t_i)
             const double c = std::cos(theta_i);
@@ -82,13 +84,13 @@ namespace graphix::factor {
             const double dx_local = c * dx_world + s * dy_world;
             const double dy_local = -s * dx_world + c * dy_world;
 
-            const double dtheta = detail::wrap_angle_pi(vj.z() - vi.z());
+            const double dtheta = detail::wrap_angle_pi(vj[2] - vi[2]);
 
-            Vec3d predicted(dx_local, dy_local, dtheta);
+            Vec3d predicted{dx_local, dy_local, dtheta};
 
             // Residual (wrap angle component)
-            Vec3d diff = predicted - measured_;
-            diff.z() = detail::wrap_angle_pi(diff.z());
+            Vec3d diff{predicted[0] - measured_[0], predicted[1] - measured_[1],
+                       detail::wrap_angle_pi(predicted[2] - measured_[2])};
 
             // Compute weighted squared error: sum((diff[i] / sigma[i])^2)
             double squared_error = 0.0;
@@ -115,16 +117,16 @@ namespace graphix::factor {
          *
          * Returns the weighted residual: (predicted - measured) ./ sigma
          */
-        inline std::vector<double> error_vector(const Values &values) const override {
+        inline datapod::mat::VectorXd error_vector(const Values &values) const override {
             // Get the two variable values
             Vec3d vi = values.at<Vec3d>(keys()[0]);
             Vec3d vj = values.at<Vec3d>(keys()[1]);
 
             // Interpret Vec3d as 2D pose (x, y, theta).
             // Measurement is in the local frame of pose i (odometry-style).
-            const double theta_i = vi.z();
-            const double dx_world = vj.x() - vi.x();
-            const double dy_world = vj.y() - vi.y();
+            const double theta_i = vi[2];
+            const double dx_world = vj[0] - vi[0];
+            const double dy_world = vj[1] - vi[1];
 
             // Rotate world delta into i frame: R(-theta_i) * (t_j - t_i)
             const double c = std::cos(theta_i);
@@ -132,16 +134,16 @@ namespace graphix::factor {
             const double dx_local = c * dx_world + s * dy_world;
             const double dy_local = -s * dx_world + c * dy_world;
 
-            const double dtheta = detail::wrap_angle_pi(vj.z() - vi.z());
+            const double dtheta = detail::wrap_angle_pi(vj[2] - vi[2]);
 
-            Vec3d predicted(dx_local, dy_local, dtheta);
+            Vec3d predicted{dx_local, dy_local, dtheta};
 
             // Residual (wrap angle component)
-            Vec3d diff = predicted - measured_;
-            diff.z() = detail::wrap_angle_pi(diff.z());
+            Vec3d diff{predicted[0] - measured_[0], predicted[1] - measured_[1],
+                       detail::wrap_angle_pi(predicted[2] - measured_[2])};
 
             // Return weighted residual
-            return {diff.x() / sigmas_.x(), diff.y() / sigmas_.y(), diff.z() / sigmas_.z()};
+            return datapod::mat::VectorXd{diff[0] / sigmas_[0], diff[1] / sigmas_[1], diff[2] / sigmas_[2]};
         }
 
         /**

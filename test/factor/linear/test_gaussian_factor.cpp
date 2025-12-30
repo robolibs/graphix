@@ -1,19 +1,23 @@
 #include "graphix/factor/linear/gaussian_factor.hpp"
 #include "graphix/factor/nonlinear/vec3_between_factor.hpp"
 #include "graphix/factor/nonlinear/vec3_prior_factor.hpp"
-#include "graphix/factor/types/vec3d.hpp"
+#include "graphix/factor/types.hpp"
+#include <datapod/sequential.hpp>
 #include <doctest/doctest.h>
 
 using namespace graphix;
 using namespace graphix::factor;
 
+namespace dp = ::datapod;
+
 TEST_CASE("GaussianFactor - construction and basic access") {
     SUBCASE("Simple 1D factor") {
-        std::vector<Key> keys = {1};
-        Matrix J(1, 1);
+        dp::Vector<Key> keys = {1};
+        GaussianFactor::Matrix J(1, 1);
         J(0, 0) = 2.0;
-        std::vector<Matrix> jacobians = {J};
-        std::vector<double> b = {3.0};
+        dp::Vector<GaussianFactor::Matrix> jacobians = {J};
+        GaussianFactor::Vector b(1);
+        b[0] = 3.0;
 
         GaussianFactor gf(keys, jacobians, b);
 
@@ -26,9 +30,9 @@ TEST_CASE("GaussianFactor - construction and basic access") {
     }
 
     SUBCASE("2D factor with 2 variables") {
-        std::vector<Key> keys = {1, 2};
+        dp::Vector<Key> keys = {1, 2};
 
-        Matrix J1(2, 3);
+        GaussianFactor::Matrix J1(2, 3);
         J1(0, 0) = 1.0;
         J1(0, 1) = 2.0;
         J1(0, 2) = 3.0;
@@ -36,7 +40,7 @@ TEST_CASE("GaussianFactor - construction and basic access") {
         J1(1, 1) = 5.0;
         J1(1, 2) = 6.0;
 
-        Matrix J2(2, 3);
+        GaussianFactor::Matrix J2(2, 3);
         J2(0, 0) = 7.0;
         J2(0, 1) = 8.0;
         J2(0, 2) = 9.0;
@@ -44,8 +48,10 @@ TEST_CASE("GaussianFactor - construction and basic access") {
         J2(1, 1) = 11.0;
         J2(1, 2) = 12.0;
 
-        std::vector<Matrix> jacobians = {J1, J2};
-        std::vector<double> b = {1.5, 2.5};
+        dp::Vector<GaussianFactor::Matrix> jacobians = {J1, J2};
+        GaussianFactor::Vector b(2);
+        b[0] = 1.5;
+        b[1] = 2.5;
 
         GaussianFactor gf(keys, jacobians, b);
 
@@ -56,21 +62,25 @@ TEST_CASE("GaussianFactor - construction and basic access") {
     }
 
     SUBCASE("Dimension mismatch throws") {
-        std::vector<Key> keys = {1, 2};
-        Matrix J1(2, 3);
-        Matrix J2(3, 3); // Wrong dimension!
-        std::vector<Matrix> jacobians = {J1, J2};
-        std::vector<double> b = {1.0, 2.0};
+        dp::Vector<Key> keys = {1, 2};
+        GaussianFactor::Matrix J1(2, 3);
+        GaussianFactor::Matrix J2(3, 3); // Wrong dimension!
+        dp::Vector<GaussianFactor::Matrix> jacobians = {J1, J2};
+        GaussianFactor::Vector b(2);
+        b[0] = 1.0;
+        b[1] = 2.0;
 
         CHECK_THROWS_AS(GaussianFactor(keys, jacobians, b), std::invalid_argument);
     }
 
     SUBCASE("Key/Jacobian count mismatch throws") {
-        std::vector<Key> keys = {1, 2, 3};
-        Matrix J1(2, 3);
-        Matrix J2(2, 3);
-        std::vector<Matrix> jacobians = {J1, J2}; // Only 2 Jacobians for 3 keys!
-        std::vector<double> b = {1.0, 2.0};
+        dp::Vector<Key> keys = {1, 2, 3};
+        GaussianFactor::Matrix J1(2, 3);
+        GaussianFactor::Matrix J2(2, 3);
+        dp::Vector<GaussianFactor::Matrix> jacobians = {J1, J2}; // Only 2 Jacobians for 3 keys!
+        GaussianFactor::Vector b(2);
+        b[0] = 1.0;
+        b[1] = 2.0;
 
         CHECK_THROWS_AS(GaussianFactor(keys, jacobians, b), std::invalid_argument);
     }
@@ -78,16 +88,19 @@ TEST_CASE("GaussianFactor - construction and basic access") {
 
 TEST_CASE("GaussianFactor - error computation") {
     SUBCASE("Zero delta gives error from b") {
-        std::vector<Key> keys = {1};
-        Matrix J(1, 1);
+        dp::Vector<Key> keys = {1};
+        GaussianFactor::Matrix J(1, 1);
         J(0, 0) = 2.0;
-        std::vector<Matrix> jacobians = {J};
-        std::vector<double> b = {3.0};
+        dp::Vector<GaussianFactor::Matrix> jacobians = {J};
+        GaussianFactor::Vector b(1);
+        b[0] = 3.0;
 
         GaussianFactor gf(keys, jacobians, b);
 
-        std::map<Key, std::vector<double>> deltas;
-        deltas[1] = {0.0};
+        std::map<Key, GaussianFactor::Vector> deltas;
+        GaussianFactor::Vector delta(1);
+        delta[0] = 0.0;
+        deltas[1] = delta;
 
         // error = 0.5 * ||b||^2 = 0.5 * 9 = 4.5
         double err = gf.error(deltas);
@@ -95,16 +108,19 @@ TEST_CASE("GaussianFactor - error computation") {
     }
 
     SUBCASE("Non-zero delta") {
-        std::vector<Key> keys = {1};
-        Matrix J(1, 1);
+        dp::Vector<Key> keys = {1};
+        GaussianFactor::Matrix J(1, 1);
         J(0, 0) = 2.0;
-        std::vector<Matrix> jacobians = {J};
-        std::vector<double> b = {3.0};
+        dp::Vector<GaussianFactor::Matrix> jacobians = {J};
+        GaussianFactor::Vector b(1);
+        b[0] = 3.0;
 
         GaussianFactor gf(keys, jacobians, b);
 
-        std::map<Key, std::vector<double>> deltas;
-        deltas[1] = {1.0};
+        std::map<Key, GaussianFactor::Vector> deltas;
+        GaussianFactor::Vector delta(1);
+        delta[0] = 1.0;
+        deltas[1] = delta;
 
         // error = 0.5 * ||J*dx + b||^2 = 0.5 * ||2*1 + 3||^2 = 0.5 * 25 = 12.5
         double err = gf.error(deltas);
@@ -112,19 +128,24 @@ TEST_CASE("GaussianFactor - error computation") {
     }
 
     SUBCASE("Multi-dimensional error") {
-        std::vector<Key> keys = {1};
-        Matrix J(2, 2);
+        dp::Vector<Key> keys = {1};
+        GaussianFactor::Matrix J(2, 2);
         J(0, 0) = 1.0;
         J(0, 1) = 0.0;
         J(1, 0) = 0.0;
         J(1, 1) = 1.0;
-        std::vector<Matrix> jacobians = {J};
-        std::vector<double> b = {3.0, 4.0};
+        dp::Vector<GaussianFactor::Matrix> jacobians = {J};
+        GaussianFactor::Vector b(2);
+        b[0] = 3.0;
+        b[1] = 4.0;
 
         GaussianFactor gf(keys, jacobians, b);
 
-        std::map<Key, std::vector<double>> deltas;
-        deltas[1] = {0.0, 0.0};
+        std::map<Key, GaussianFactor::Vector> deltas;
+        GaussianFactor::Vector delta(2);
+        delta[0] = 0.0;
+        delta[1] = 0.0;
+        deltas[1] = delta;
 
         // error = 0.5 * (3^2 + 4^2) = 0.5 * 25 = 12.5
         double err = gf.error(deltas);
@@ -132,19 +153,24 @@ TEST_CASE("GaussianFactor - error computation") {
     }
 
     SUBCASE("Two variables") {
-        std::vector<Key> keys = {1, 2};
-        Matrix J1(1, 1);
+        dp::Vector<Key> keys = {1, 2};
+        GaussianFactor::Matrix J1(1, 1);
         J1(0, 0) = 2.0;
-        Matrix J2(1, 1);
+        GaussianFactor::Matrix J2(1, 1);
         J2(0, 0) = 3.0;
-        std::vector<Matrix> jacobians = {J1, J2};
-        std::vector<double> b = {1.0};
+        dp::Vector<GaussianFactor::Matrix> jacobians = {J1, J2};
+        GaussianFactor::Vector b(1);
+        b[0] = 1.0;
 
         GaussianFactor gf(keys, jacobians, b);
 
-        std::map<Key, std::vector<double>> deltas;
-        deltas[1] = {1.0};
-        deltas[2] = {1.0};
+        std::map<Key, GaussianFactor::Vector> deltas;
+        GaussianFactor::Vector delta1(1);
+        delta1[0] = 1.0;
+        deltas[1] = delta1;
+        GaussianFactor::Vector delta2(1);
+        delta2[0] = 1.0;
+        deltas[2] = delta2;
 
         // error = 0.5 * ||2*1 + 3*1 + 1||^2 = 0.5 * 36 = 18
         double err = gf.error(deltas);
@@ -154,12 +180,12 @@ TEST_CASE("GaussianFactor - error computation") {
 
 TEST_CASE("Vec3PriorFactor - linearization") {
     SUBCASE("Linearize at zero") {
-        Vec3d prior(0, 0, 0);
-        Vec3d sigmas(1, 1, 1);
+        Vec3d prior{0, 0, 0};
+        Vec3d sigmas{1, 1, 1};
         Vec3PriorFactor factor(1, prior, sigmas);
 
         Values values;
-        values.insert<Vec3d>(1, Vec3d(0, 0, 0));
+        values.insert<Vec3d>(1, Vec3d{0, 0, 0});
 
         auto gf = factor.linearize(values);
 
@@ -193,12 +219,12 @@ TEST_CASE("Vec3PriorFactor - linearization") {
     }
 
     SUBCASE("Linearize away from prior") {
-        Vec3d prior(1, 2, 0);
-        Vec3d sigmas(0.1, 0.1, 0.1);
+        Vec3d prior{1, 2, 0};
+        Vec3d sigmas{0.1, 0.1, 0.1};
         Vec3PriorFactor factor(1, prior, sigmas);
 
         Values values;
-        values.insert<Vec3d>(1, Vec3d(1.5, 2.5, 0.1));
+        values.insert<Vec3d>(1, Vec3d{1.5, 2.5, 0.1});
 
         auto gf = factor.linearize(values);
 
@@ -218,13 +244,13 @@ TEST_CASE("Vec3PriorFactor - linearization") {
 
 TEST_CASE("Vec3BetweenFactor - linearization") {
     SUBCASE("Linearize with identity measurement") {
-        Vec3d measured(0, 0, 0); // No motion
-        Vec3d sigmas(1, 1, 1);
+        Vec3d measured{0, 0, 0}; // No motion
+        Vec3d sigmas{1, 1, 1};
         Vec3BetweenFactor factor(1, 2, measured, sigmas);
 
         Values values;
-        values.insert<Vec3d>(1, Vec3d(0, 0, 0));
-        values.insert<Vec3d>(2, Vec3d(0, 0, 0));
+        values.insert<Vec3d>(1, Vec3d{0, 0, 0});
+        values.insert<Vec3d>(2, Vec3d{0, 0, 0});
 
         auto gf = factor.linearize(values);
 
@@ -245,13 +271,13 @@ TEST_CASE("Vec3BetweenFactor - linearization") {
     }
 
     SUBCASE("Linearize with translation") {
-        Vec3d measured(1, 0, 0); // Move forward 1 meter
-        Vec3d sigmas(0.1, 0.1, 0.1);
+        Vec3d measured{1, 0, 0}; // Move forward 1 meter
+        Vec3d sigmas{0.1, 0.1, 0.1};
         Vec3BetweenFactor factor(1, 2, measured, sigmas);
 
         Values values;
-        values.insert<Vec3d>(1, Vec3d(0, 0, 0));
-        values.insert<Vec3d>(2, Vec3d(1, 0, 0)); // Exactly at measurement
+        values.insert<Vec3d>(1, Vec3d{0, 0, 0});
+        values.insert<Vec3d>(2, Vec3d{1, 0, 0}); // Exactly at measurement
 
         auto gf = factor.linearize(values);
 
@@ -263,13 +289,13 @@ TEST_CASE("Vec3BetweenFactor - linearization") {
     }
 
     SUBCASE("Linearize with error") {
-        Vec3d measured(1, 0, 0);
-        Vec3d sigmas(0.1, 0.1, 0.1);
+        Vec3d measured{1, 0, 0};
+        Vec3d sigmas{0.1, 0.1, 0.1};
         Vec3BetweenFactor factor(1, 2, measured, sigmas);
 
         Values values;
-        values.insert<Vec3d>(1, Vec3d(0, 0, 0));
-        values.insert<Vec3d>(2, Vec3d(1.5, 0.2, 0.1)); // Deviated from measurement
+        values.insert<Vec3d>(1, Vec3d{0, 0, 0});
+        values.insert<Vec3d>(2, Vec3d{1.5, 0.2, 0.1}); // Deviated from measurement
 
         auto gf = factor.linearize(values);
 
@@ -285,12 +311,12 @@ TEST_CASE("Vec3BetweenFactor - linearization") {
 
 TEST_CASE("Linearization - numerical stability") {
     SUBCASE("Very small sigmas") {
-        Vec3d prior(0, 0, 0);
-        Vec3d sigmas(0.001, 0.001, 0.001);
+        Vec3d prior{0, 0, 0};
+        Vec3d sigmas{0.001, 0.001, 0.001};
         Vec3PriorFactor factor(1, prior, sigmas);
 
         Values values;
-        values.insert<Vec3d>(1, Vec3d(0.0001, 0.0001, 0.0001));
+        values.insert<Vec3d>(1, Vec3d{0.0001, 0.0001, 0.0001});
 
         auto gf = factor.linearize(values);
 
@@ -302,12 +328,12 @@ TEST_CASE("Linearization - numerical stability") {
     }
 
     SUBCASE("Large values") {
-        Vec3d prior(1000, 2000, 3.14);
-        Vec3d sigmas(10, 10, 0.1);
+        Vec3d prior{1000, 2000, 3.14};
+        Vec3d sigmas{10, 10, 0.1};
         Vec3PriorFactor factor(1, prior, sigmas);
 
         Values values;
-        values.insert<Vec3d>(1, Vec3d(1050, 2050, 3.24));
+        values.insert<Vec3d>(1, Vec3d{1050, 2050, 3.24});
 
         auto gf = factor.linearize(values);
 
@@ -324,12 +350,12 @@ TEST_CASE("Linearization - verify with analytical derivatives") {
         // For a prior factor with weighted residual r = (x - prior) / sigma
         // The Jacobian is dr/dx = 1/sigma * I (identity matrix)
 
-        Vec3d prior(1, 2, 3);
-        Vec3d sigmas(0.5, 0.5, 0.5);
+        Vec3d prior{1, 2, 3};
+        Vec3d sigmas{0.5, 0.5, 0.5};
         Vec3PriorFactor factor(1, prior, sigmas);
 
         Values values;
-        values.insert<Vec3d>(1, Vec3d(1.1, 2.1, 3.1));
+        values.insert<Vec3d>(1, Vec3d{1.1, 2.1, 3.1});
 
         auto gf = factor.linearize(values);
         const auto &J = gf->jacobian(1);

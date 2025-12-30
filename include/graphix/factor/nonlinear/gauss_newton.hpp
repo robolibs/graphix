@@ -2,13 +2,13 @@
 
 #include "graphix/factor/graph.hpp"
 #include "graphix/factor/linear/gaussian_factor.hpp"
-#include "graphix/factor/linear/matrix.hpp"
 #include "graphix/factor/nonlinear/nonlinear_factor.hpp"
-#include "graphix/factor/types/vec3d.hpp"
 #include "graphix/factor/values.hpp"
 #include <cmath>
+#include <datapod/matrix.hpp>
 #include <iostream>
 #include <map>
+#include <optinum/lina/solve/solve_dynamic.hpp>
 
 namespace graphix::factor {
 
@@ -78,27 +78,21 @@ namespace graphix::factor {
 
             for (int iter = 0; iter < params_.max_iterations; ++iter) {
                 // Build linear system J^T*J * dx = -J^T*b
-                Matrix JtJ(1, 1); // Temporary initialization, will be resized in build_linear_system
-                std::vector<double> Jtb;
+                datapod::mat::MatrixXd JtJ(1, 1); // Temporary initialization, will be resized
+                datapod::mat::VectorXd Jtb;
                 std::vector<Key> variable_ordering;
 
                 build_linear_system(graph, current, JtJ, Jtb, variable_ordering);
 
-                // Solve for dx
-                std::vector<double> dx;
-                try {
-                    dx = JtJ.solve_cholesky(Jtb);
-                } catch (const std::exception &e) {
-                    if (params_.verbose) {
-                        std::cout << "Cholesky failed at iteration " << iter << ": " << e.what() << std::endl;
-                    }
-                    return Result(current, current_error, iter, false);
-                }
+                // Solve for dx using optinum solver
+                optinum::simd::Matrix<double, optinum::simd::Dynamic, optinum::simd::Dynamic> JtJ_view(JtJ);
+                optinum::simd::Vector<double, optinum::simd::Dynamic> Jtb_view(Jtb);
+                auto dx = optinum::lina::solve_dynamic<double>(JtJ_view, Jtb_view);
 
                 // Check step norm for convergence
                 double step_norm = 0.0;
-                for (double val : dx) {
-                    step_norm += val * val;
+                for (size_t i = 0; i < dx.size(); ++i) {
+                    step_norm += dx[i] * dx[i];
                 }
                 step_norm = std::sqrt(step_norm);
 
@@ -148,8 +142,8 @@ namespace graphix::factor {
                         new_values.erase(key);
                         new_values.insert(key, x + dx[offset]);
                     } else if (dim == 3) {
-                        // Vec3d variable
-                        Vec3d x = current.at<Vec3d>(key);
+                        // vector3d variable
+                        datapod::mat::vector3d x = current.at<datapod::mat::vector3d>(key);
                         x[0] += dx[offset];
                         x[1] += dx[offset + 1];
                         x[2] += dx[offset + 2];
@@ -219,8 +213,9 @@ namespace graphix::factor {
          * @param Jtb Output: -J^T * b vector
          * @param variable_ordering Output: mapping from variable index to Key
          */
-        inline void build_linear_system(const Graph<NonlinearFactor> &graph, const Values &values, Matrix &JtJ,
-                                        std::vector<double> &Jtb, std::vector<Key> &variable_ordering) const {
+        inline void build_linear_system(const Graph<NonlinearFactor> &graph, const Values &values,
+                                        datapod::mat::MatrixXd &JtJ, datapod::mat::VectorXd &Jtb,
+                                        std::vector<Key> &variable_ordering) const {
             // Step 1: Collect all unique variables and assign indices
             std::map<Key, size_t> key_to_index;
             std::map<Key, size_t> key_to_dim;
@@ -239,7 +234,7 @@ namespace graphix::factor {
             }
 
             // Step 2: Initialize J^T*J and J^T*b
-            JtJ = Matrix(total_dim, total_dim);
+            JtJ = datapod::mat::MatrixXd(total_dim, total_dim);
             Jtb.resize(total_dim, 0.0);
 
             // Step 3: For each factor, linearize and accumulate
@@ -257,7 +252,7 @@ namespace graphix::factor {
                 for (size_t i = 0; i < factor_keys.size(); ++i) {
                     Key key_i = factor_keys[i];
                     size_t idx_i = key_to_index[key_i];
-                    const Matrix &Ji = jacobians[i];
+                    const auto &Ji = jacobians[i];
 
                     // Add J_i^T * b to Jtb
                     for (size_t row = 0; row < Ji.rows(); ++row) {
@@ -270,7 +265,7 @@ namespace graphix::factor {
                     for (size_t j = 0; j < factor_keys.size(); ++j) {
                         Key key_j = factor_keys[j];
                         size_t idx_j = key_to_index[key_j];
-                        const Matrix &Jj = jacobians[j];
+                        const auto &Jj = jacobians[j];
 
                         // Compute J_i^T * J_j
                         for (size_t row_i = 0; row_i < Ji.cols(); ++row_i) {

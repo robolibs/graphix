@@ -2,9 +2,8 @@
 
 #include "graphix/factor/graph.hpp"
 #include "graphix/factor/linear/gaussian_factor.hpp"
-#include "graphix/factor/linear/matrix.hpp"
 #include "graphix/factor/nonlinear/nonlinear_factor.hpp"
-#include "graphix/factor/types/vec3d.hpp"
+#include "graphix/factor/types.hpp"
 #include "graphix/factor/values.hpp"
 #include <cmath>
 #include <iostream>
@@ -86,20 +85,18 @@ namespace graphix::factor {
 
             for (int iter = 0; iter < params_.max_iterations; ++iter) {
                 // Build linear system (J^T*J + λ*I) * dx = -J^T*b
-                Matrix JtJ_lambda(1, 1); // Temporary initialization, will be resized in build_linear_system
-                std::vector<double> Jtb;
-                std::vector<Key> variable_ordering;
+                DynMat JtJ_lambda(1, 1); // Temporary initialization, will be resized in build_linear_system
+                DynVec Jtb;
+                Vector<Key> variable_ordering;
 
                 build_linear_system(graph, current, lambda, JtJ_lambda, Jtb, variable_ordering);
 
-                // Solve for dx
-                std::vector<double> dx;
-                try {
-                    dx = JtJ_lambda.solve_cholesky(Jtb);
-                } catch (const std::exception &e) {
-                    // Cholesky failed - increase damping and retry
+                // Solve for dx using try_solve (returns Result with error handling)
+                auto solve_result = try_solve(JtJ_lambda, Jtb);
+                if (!solve_result.is_ok()) {
+                    // Solve failed - increase damping and retry
                     if (params_.verbose) {
-                        std::cout << "Cholesky failed at iteration " << iter << ": " << e.what() << std::endl;
+                        std::cout << "Solve failed at iteration " << iter << std::endl;
                         std::cout << "Increasing lambda from " << lambda << " to " << lambda * params_.lambda_factor
                                   << std::endl;
                     }
@@ -115,12 +112,10 @@ namespace graphix::factor {
                     continue; // Retry with larger lambda
                 }
 
+                DynVec dx = solve_result.value();
+
                 // Check step norm for convergence
-                double step_norm = 0.0;
-                for (double val : dx) {
-                    step_norm += val * val;
-                }
-                step_norm = std::sqrt(step_norm);
+                double step_norm = norm(dx);
 
                 if (params_.verbose) {
                     std::cout << "Iter " << iter << ": error = " << current_error << ", step_norm = " << step_norm
@@ -269,8 +264,7 @@ namespace graphix::factor {
          * @param variable_ordering Output: mapping from variable index to Key
          */
         inline void build_linear_system(const Graph<NonlinearFactor> &graph, const Values &values, double lambda,
-                                        Matrix &JtJ_lambda, std::vector<double> &Jtb,
-                                        std::vector<Key> &variable_ordering) const {
+                                        DynMat &JtJ_lambda, DynVec &Jtb, Vector<Key> &variable_ordering) const {
             // Step 1: Collect all unique variables and assign indices
             std::map<Key, size_t> key_to_index;
             std::map<Key, size_t> key_to_dim;
@@ -289,8 +283,8 @@ namespace graphix::factor {
             }
 
             // Step 2: Initialize J^T*J and J^T*b
-            JtJ_lambda = Matrix(total_dim, total_dim);
-            Jtb.resize(total_dim, 0.0);
+            JtJ_lambda = DynMat(total_dim, total_dim);
+            Jtb = DynVec(total_dim, 0.0);
 
             // Step 3: For each factor, linearize and accumulate J^T*J and J^T*b
             for (size_t fi = 0; fi < graph.size(); ++fi) {
@@ -307,7 +301,7 @@ namespace graphix::factor {
                 for (size_t i = 0; i < factor_keys.size(); ++i) {
                     Key key_i = factor_keys[i];
                     size_t idx_i = key_to_index[key_i];
-                    const Matrix &Ji = jacobians[i];
+                    const auto &Ji = jacobians[i];
 
                     // Add J_i^T * b to Jtb
                     for (size_t row = 0; row < Ji.rows(); ++row) {
@@ -320,7 +314,7 @@ namespace graphix::factor {
                     for (size_t j = 0; j < factor_keys.size(); ++j) {
                         Key key_j = factor_keys[j];
                         size_t idx_j = key_to_index[key_j];
-                        const Matrix &Jj = jacobians[j];
+                        const auto &Jj = jacobians[j];
 
                         // Compute J_i^T * J_j
                         for (size_t row_i = 0; row_i < Ji.cols(); ++row_i) {
@@ -338,9 +332,7 @@ namespace graphix::factor {
 
             // Step 4: Add damping to diagonal (λ*I)
             // This is the key difference from Gauss-Newton!
-            for (size_t i = 0; i < total_dim; ++i) {
-                JtJ_lambda(i, i) += lambda;
-            }
+            add_diagonal(JtJ_lambda, lambda);
         }
     };
 
