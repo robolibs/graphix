@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.0.3] - 2025-12-31
+
+### <!-- 3 -->📚 Documentation
+
+- Comprehensive README update
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Refactor build system and dependencies
+
 ## [0.0.2] - 2025-12-30
 
 ### <!-- 0 -->⛰️  Features
