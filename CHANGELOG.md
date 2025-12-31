@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.4] - 2025-12-31
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update build systems for SIMD and dependencies
+
 ## [0.0.3] - 2025-12-31
 
 ### <!-- 3 -->📚 Documentation
