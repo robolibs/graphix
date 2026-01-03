@@ -1,7 +1,6 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <doctest/doctest.h>
 #include "graphix/vertex/algorithms/cycle_detection.hpp"
 #include "graphix/vertex/graph.hpp"
+#include <doctest/doctest.h>
 
 using namespace graphix::vertex;
 

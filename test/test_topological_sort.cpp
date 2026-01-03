@@ -1,7 +1,6 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <doctest/doctest.h>
 #include "graphix/vertex/algorithms/topological_sort.hpp"
 #include "graphix/vertex/graph.hpp"
+#include <doctest/doctest.h>
 
 using namespace graphix::vertex;
 

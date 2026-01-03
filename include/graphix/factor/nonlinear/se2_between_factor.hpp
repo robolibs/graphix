@@ -38,7 +38,7 @@ namespace graphix::factor {
      */
     class SE2BetweenFactor : public NonlinearFactor {
       public:
-        using Tangent = SE2d::Tangent; // dp::mat::vector<double, 3>
+        using Tangent = SE2d::Tangent; // dp::mat::Vector<double, 3>
 
         /**
          * @brief Construct SE2 between factor

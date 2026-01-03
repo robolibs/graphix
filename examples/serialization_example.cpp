@@ -220,8 +220,12 @@ void example5_visualization() {
     int result = system("which dot > /dev/null 2>&1");
     if (result == 0) {
         std::cout << "\nGraphviz 'dot' command found! Generating PNG...\n";
-        system("dot -Tpng visualization.dot -o visualization.png");
-        std::cout << "Generated visualization.png\n";
+        int gen_result = system("dot -Tpng visualization.dot -o visualization.png");
+        if (gen_result == 0) {
+            std::cout << "Generated visualization.png\n";
+        } else {
+            std::cout << "Failed to generate visualization.png\n";
+        }
     } else {
         std::cout << "\nGraphviz 'dot' command not found. Install graphviz to generate images.\n";
     }

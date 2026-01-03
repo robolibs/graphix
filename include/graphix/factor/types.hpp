@@ -5,7 +5,7 @@
  * @brief Type definitions for the factor graph module
  *
  * Architecture:
- * - DATAPOD owns all data (dp::mat::vector, dp::mat::matrix, dp::Vector, etc.)
+ * - DATAPOD owns all data (dp::mat::Vector, dp::mat::Matrix, dp::Vector, etc.)
  * - OPTINUM provides SIMD operations on datapod types (does NOT own data)
  *
  * This file provides:
@@ -34,8 +34,8 @@ namespace graphix::factor {
     // Fixed-size vector types (data storage from datapod::mat)
     // =========================================================================
 
-    using Vec3d = dp::mat::vector3d;
-    using Vec3f = dp::mat::vector3f;
+    using Vec3d = dp::mat::Vector3d;
+    using Vec3f = dp::mat::Vector3f;
 
     // =========================================================================
     // Lie group types (from optinum::lie)
@@ -64,8 +64,8 @@ namespace graphix::factor {
     // Fixed-size matrix types (data storage from datapod::mat, COLUMN-MAJOR)
     // =========================================================================
 
-    using Mat3d = dp::mat::matrix3x3d;
-    using Mat3f = dp::mat::matrix3x3f;
+    using Mat3d = dp::mat::Matrix3x3d;
+    using Mat3f = dp::mat::Matrix3x3f;
 
     // =========================================================================
     // Container types (from datapod)

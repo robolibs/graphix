@@ -1,7 +1,6 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <doctest/doctest.h>
 #include "graphix/vertex/algorithms/strongly_connected_components.hpp"
 #include "graphix/vertex/graph.hpp"
+#include <doctest/doctest.h>
 
 using namespace graphix::vertex;
 

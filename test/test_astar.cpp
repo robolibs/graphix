@@ -1,8 +1,7 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <doctest/doctest.h>
 #include "graphix/vertex/algorithms/astar.hpp"
 #include "graphix/vertex/graph.hpp"
 #include <cmath>
+#include <doctest/doctest.h>
 
 using namespace graphix::vertex;
 using namespace graphix::vertex::algorithms;

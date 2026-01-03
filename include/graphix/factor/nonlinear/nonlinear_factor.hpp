@@ -125,8 +125,8 @@ namespace graphix::factor {
                         }
 
                         if (!handled) {
-                            // Fall back to vector3d (for backward compatibility)
-                            dp::mat::vector3d x = values.at<dp::mat::vector3d>(key);
+                            // Fall back to Vector3d (for backward compatibility)
+                            dp::mat::Vector3d x = values.at<dp::mat::Vector3d>(key);
                             x[j] += epsilon;
                             perturbed.erase(key);
                             perturbed.insert(key, x);

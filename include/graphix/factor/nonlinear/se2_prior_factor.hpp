@@ -33,7 +33,7 @@ namespace graphix::factor {
      */
     class SE2PriorFactor : public NonlinearFactor {
       public:
-        using Tangent = SE2d::Tangent; // dp::mat::vector<double, 3>
+        using Tangent = SE2d::Tangent; // dp::mat::Vector<double, 3>
 
         /**
          * @brief Construct SE2 prior factor

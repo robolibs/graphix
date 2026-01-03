@@ -1,7 +1,6 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <doctest/doctest.h>
 #include "graphix/vertex/graph.hpp"
 #include "graphix/vertex/property_map.hpp"
+#include <doctest/doctest.h>
 #include <string>
 
 using namespace graphix::vertex;
