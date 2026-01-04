@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.6] - 2026-01-04
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update dependencies and dev environment
+
 ## [0.0.5] - 2026-01-03
 
 ### <!-- 7 -->⚙️ Miscellaneous Tasks
