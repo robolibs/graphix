@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.7] - 2026-01-18
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Migrate to CMake for build system
+
 ## [0.0.6] - 2026-01-04
 
 ### <!-- 7 -->⚙️ Miscellaneous Tasks
