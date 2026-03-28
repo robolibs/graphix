@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.9] - 2026-03-28
+
+### <!-- 0 -->⛰️  Features
+
+- Add support for native edge properties
+
 ## [0.0.8] - 2026-03-02
 
 ### <!-- 1 -->🐛 Bug Fixes
