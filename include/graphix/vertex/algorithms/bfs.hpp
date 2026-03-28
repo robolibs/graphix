@@ -1,15 +1,11 @@
 #pragma once
 
+#include "graphix/vertex/graph.hpp"
 #include <algorithm>
 #include <queue>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-// Forward declarations to avoid circular dependencies
-namespace graphix::vertex {
-    template <typename VertexProperty> class Graph;
-}
 
 namespace graphix::vertex::algorithms {
 

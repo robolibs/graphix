@@ -11,6 +11,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -35,13 +36,24 @@ namespace graphix {
             EdgeType type;
         };
 
-        // Forward declaration for void specialization
-        template <typename VertexProperty = void> class Graph;
+        // Forward declaration for graph templates
+        template <typename VertexProperty = void, typename EdgeProperty = void> class Graph;
+
+        template <typename EdgeProperty> struct EdgePropertyHolder {
+            EdgeProperty property;
+        };
+
+        template <> struct EdgePropertyHolder<void> {};
+
+        template <typename EdgeProperty>
+        using EdgePropertyParamT =
+            std::conditional_t<std::is_void_v<EdgeProperty>, EdgePropertyHolder<void>, EdgeProperty>;
 
         // Specialization for graphs without vertex properties
-        template <> class Graph<void> {
+        template <typename EdgeProperty> class Graph<void, EdgeProperty> {
           public:
             using VertexId = Key;
+            using EdgePropertyType = EdgeProperty;
 
             Graph() = default;
             Graph(const Graph &other) = default;
@@ -61,6 +73,53 @@ namespace graphix {
 
             // Edge operations
             inline EdgeId add_edge(VertexId u, VertexId v, double weight = 1.0, EdgeType type = EdgeType::Undirected) {
+                if constexpr (std::is_void_v<EdgeProperty>) {
+                    return add_edge_impl(u, v, weight, type);
+                } else {
+                    static_assert(std::is_default_constructible_v<EdgeProperty>,
+                                  "Graph with edge properties requires default-constructible EdgeProperty for the "
+                                  "backward-compatible add_edge overload");
+                    return add_edge_impl(u, v, weight, type, EdgeProperty{});
+                }
+            }
+
+            template <typename EP = EdgeProperty, typename = std::enable_if_t<!std::is_void_v<EP>, int>>
+            inline EdgeId add_edge(VertexId u, VertexId v, double weight, EdgeType type,
+                                   const EdgePropertyParamT<EdgeProperty> &prop) {
+                return add_edge_impl(u, v, weight, type, prop);
+            }
+
+            template <typename EP = EdgeProperty, typename = std::enable_if_t<!std::is_void_v<EP>, int>>
+            inline EdgeId add_edge(VertexId u, VertexId v, const EdgePropertyParamT<EdgeProperty> &prop) {
+                return add_edge_impl(u, v, 1.0, EdgeType::Undirected, prop);
+            }
+
+            template <typename EP = EdgeProperty, typename = std::enable_if_t<!std::is_void_v<EP>, int>>
+            inline EdgePropertyParamT<EdgeProperty> &edge_property(EdgeId e) {
+                for (auto &[vertex, edges] : m_adjacency) {
+                    for (auto &edge : edges) {
+                        if (edge.id == e) {
+                            return edge.property;
+                        }
+                    }
+                }
+                throw std::invalid_argument("Edge ID not found");
+            }
+
+            template <typename EP = EdgeProperty, typename = std::enable_if_t<!std::is_void_v<EP>, int>>
+            inline const EdgePropertyParamT<EdgeProperty> &edge_property(EdgeId e) const {
+                for (const auto &[vertex, edges] : m_adjacency) {
+                    for (const auto &edge : edges) {
+                        if (edge.id == e) {
+                            return edge.property;
+                        }
+                    }
+                }
+                throw std::invalid_argument("Edge ID not found");
+            }
+
+          private:
+            inline EdgeId add_edge_impl(VertexId u, VertexId v, double weight, EdgeType type) {
                 // Verify both vertices exist
                 if (!has_vertex(u) || !has_vertex(v)) {
                     throw std::invalid_argument("Cannot add edge: one or both vertices do not exist");
@@ -68,18 +127,64 @@ namespace graphix {
 
                 EdgeId edge_id = m_next_edge_id++;
 
-                // Add edge u -> v
-                m_adjacency[u].push_back({u, v, weight, edge_id, type});
+                Edge forward{};
+                forward.source = u;
+                forward.target = v;
+                forward.weight = weight;
+                forward.id = edge_id;
+                forward.type = type;
+                m_adjacency[u].push_back(forward);
 
                 // For undirected edges, also add v -> u
                 if (type == EdgeType::Undirected) {
-                    m_adjacency[v].push_back({v, u, weight, edge_id, type});
+                    Edge reverse{};
+                    reverse.source = v;
+                    reverse.target = u;
+                    reverse.weight = weight;
+                    reverse.id = edge_id;
+                    reverse.type = type;
+                    m_adjacency[v].push_back(reverse);
                 }
 
                 m_edge_count++;
                 return edge_id;
             }
 
+            inline EdgeId add_edge_impl(VertexId u, VertexId v, double weight, EdgeType type,
+                                        const EdgePropertyParamT<EdgeProperty> &prop) {
+                // Verify both vertices exist
+                if (!has_vertex(u) || !has_vertex(v)) {
+                    throw std::invalid_argument("Cannot add edge: one or both vertices do not exist");
+                }
+
+                EdgeId edge_id = m_next_edge_id++;
+
+                Edge forward{};
+                forward.source = u;
+                forward.target = v;
+                forward.weight = weight;
+                forward.id = edge_id;
+                forward.type = type;
+                forward.property = prop;
+                m_adjacency[u].push_back(forward);
+
+                // For undirected edges, also add v -> u
+                if (type == EdgeType::Undirected) {
+                    Edge reverse{};
+                    reverse.source = v;
+                    reverse.target = u;
+                    reverse.weight = weight;
+                    reverse.id = edge_id;
+                    reverse.type = type;
+                    reverse.property = prop;
+                    m_adjacency[v].push_back(reverse);
+                }
+
+                m_edge_count++;
+                return edge_id;
+            }
+
+          public:
             inline bool has_edge(VertexId u, VertexId v) const {
                 auto it = m_adjacency.find(u);
                 if (it == m_adjacency.end()) {
@@ -378,13 +483,13 @@ namespace graphix {
                 out.close();
             }
 
-            static inline Graph<void> load_dot(const std::string &filename) {
+            static inline Graph<void, EdgeProperty> load_dot(const std::string &filename) {
                 std::ifstream in(filename);
                 if (!in.is_open()) {
                     throw std::runtime_error("Failed to open file for reading: " + filename);
                 }
 
-                Graph<void> g;
+                Graph<void, EdgeProperty> g;
                 std::map<std::string, VertexId> id_map;
                 bool is_directed = false;
 
@@ -491,7 +596,7 @@ namespace graphix {
             }
 
           private:
-            struct Edge {
+            struct Edge : EdgePropertyHolder<EdgeProperty> {
                 VertexId source;
                 VertexId target;
                 double weight;
@@ -506,9 +611,10 @@ namespace graphix {
         };
 
         // General template for graphs with vertex properties
-        template <typename VertexProperty> class Graph {
+        template <typename VertexProperty, typename EdgeProperty> class Graph {
           public:
             using VertexId = Key;
+            using EdgePropertyType = EdgeProperty;
 
             Graph() = default;
             Graph(const Graph &other) = default;
@@ -525,10 +631,22 @@ namespace graphix {
 
             // Edge operations
             EdgeId add_edge(VertexId u, VertexId v, double weight = 1.0, EdgeType type = EdgeType::Undirected);
+            template <typename EP = EdgeProperty, typename = std::enable_if_t<!std::is_void_v<EP>, int>>
+            EdgeId add_edge(VertexId u, VertexId v, double weight, EdgeType type,
+                            const EdgePropertyParamT<EdgeProperty> &prop);
+
+            template <typename EP = EdgeProperty, typename = std::enable_if_t<!std::is_void_v<EP>, int>>
+            EdgeId add_edge(VertexId u, VertexId v, const EdgePropertyParamT<EdgeProperty> &prop);
             bool has_edge(VertexId u, VertexId v) const;
             double get_weight(EdgeId e) const;
             void set_weight(EdgeId e, double weight);
             size_t edge_count() const;
+
+            template <typename EP = EdgeProperty, typename = std::enable_if_t<!std::is_void_v<EP>, int>>
+            EdgePropertyParamT<EdgeProperty> &edge_property(EdgeId e);
+
+            template <typename EP = EdgeProperty, typename = std::enable_if_t<!std::is_void_v<EP>, int>>
+            const EdgePropertyParamT<EdgeProperty> &edge_property(EdgeId e) const;
 
             // Edge query functions
             std::optional<EdgeId> get_edge(VertexId u, VertexId v) const;
@@ -557,10 +675,10 @@ namespace graphix {
             void save_dot(const std::string &filename, PropertyWriter write_prop) const;
 
             template <typename PropertyReader>
-            static Graph<VertexProperty> load_dot(const std::string &filename, PropertyReader read_prop);
+            static Graph<VertexProperty, EdgeProperty> load_dot(const std::string &filename, PropertyReader read_prop);
 
           private:
-            struct Edge {
+            struct Edge : EdgePropertyHolder<EdgeProperty> {
                 VertexId source;
                 VertexId target;
                 double weight;
@@ -579,31 +697,36 @@ namespace graphix {
         // ============================================================================
 
         // Template implementation
-        template <typename VertexProperty>
-        typename Graph<VertexProperty>::VertexId Graph<VertexProperty>::add_vertex(const VertexProperty &prop) {
+        template <typename VertexProperty, typename EdgeProperty>
+        typename Graph<VertexProperty, EdgeProperty>::VertexId
+        Graph<VertexProperty, EdgeProperty>::add_vertex(const VertexProperty &prop) {
             auto id = m_vertices.add(prop);
             return id.value();
         }
 
-        template <typename VertexProperty> VertexProperty &Graph<VertexProperty>::operator[](VertexId v) {
+        template <typename VertexProperty, typename EdgeProperty>
+        VertexProperty &Graph<VertexProperty, EdgeProperty>::operator[](VertexId v) {
             return m_vertices[Id<VertexProperty>(v)];
         }
 
-        template <typename VertexProperty> const VertexProperty &Graph<VertexProperty>::operator[](VertexId v) const {
+        template <typename VertexProperty, typename EdgeProperty>
+        const VertexProperty &Graph<VertexProperty, EdgeProperty>::operator[](VertexId v) const {
             return m_vertices[Id<VertexProperty>(v)];
         }
 
-        template <typename VertexProperty> size_t Graph<VertexProperty>::vertex_count() const {
+        template <typename VertexProperty, typename EdgeProperty>
+        size_t Graph<VertexProperty, EdgeProperty>::vertex_count() const {
             return m_vertices.size();
         }
 
-        template <typename VertexProperty> bool Graph<VertexProperty>::has_vertex(VertexId v) const {
+        template <typename VertexProperty, typename EdgeProperty>
+        bool Graph<VertexProperty, EdgeProperty>::has_vertex(VertexId v) const {
             return m_vertices.contains(Id<VertexProperty>(v));
         }
 
         // Edge operations
-        template <typename VertexProperty>
-        EdgeId Graph<VertexProperty>::add_edge(VertexId u, VertexId v, double weight, EdgeType type) {
+        template <typename VertexProperty, typename EdgeProperty>
+        EdgeId Graph<VertexProperty, EdgeProperty>::add_edge(VertexId u, VertexId v, double weight, EdgeType type) {
             // Verify both vertices exist
             if (!has_vertex(u) || !has_vertex(v)) {
                 throw std::invalid_argument("Cannot add edge: one or both vertices do not exist");
@@ -611,19 +734,125 @@ namespace graphix {
 
             EdgeId edge_id = m_next_edge_id++;
 
-            // Add edge u -> v
-            m_adjacency[u].push_back({u, v, weight, edge_id, type});
+            if constexpr (std::is_void_v<EdgeProperty>) {
+                Edge forward{};
+                forward.source = u;
+                forward.target = v;
+                forward.weight = weight;
+                forward.id = edge_id;
+                forward.type = type;
+                m_adjacency[u].push_back(forward);
 
-            // For undirected edges, also add v -> u
-            if (type == EdgeType::Undirected) {
-                m_adjacency[v].push_back({v, u, weight, edge_id, type});
+                // For undirected edges, also add v -> u
+                if (type == EdgeType::Undirected) {
+                    Edge reverse{};
+                    reverse.source = v;
+                    reverse.target = u;
+                    reverse.weight = weight;
+                    reverse.id = edge_id;
+                    reverse.type = type;
+                    m_adjacency[v].push_back(reverse);
+                }
+            } else {
+                static_assert(std::is_default_constructible_v<EdgeProperty>,
+                              "Graph with edge properties requires default-constructible EdgeProperty for the "
+                              "backward-compatible add_edge overload");
+
+                Edge forward{};
+                forward.source = u;
+                forward.target = v;
+                forward.weight = weight;
+                forward.id = edge_id;
+                forward.type = type;
+                forward.property = EdgeProperty{};
+                m_adjacency[u].push_back(forward);
+
+                // For undirected edges, also add v -> u
+                if (type == EdgeType::Undirected) {
+                    Edge reverse{};
+                    reverse.source = v;
+                    reverse.target = u;
+                    reverse.weight = weight;
+                    reverse.id = edge_id;
+                    reverse.type = type;
+                    reverse.property = EdgeProperty{};
+                    m_adjacency[v].push_back(reverse);
+                }
             }
 
             m_edge_count++;
             return edge_id;
         }
 
-        template <typename VertexProperty> bool Graph<VertexProperty>::has_edge(VertexId u, VertexId v) const {
+        template <typename VertexProperty, typename EdgeProperty>
+        template <typename EP, typename>
+        EdgeId Graph<VertexProperty, EdgeProperty>::add_edge(VertexId u, VertexId v, double weight, EdgeType type,
+                                                             const EdgePropertyParamT<EdgeProperty> &prop) {
+            // Verify both vertices exist
+            if (!has_vertex(u) || !has_vertex(v)) {
+                throw std::invalid_argument("Cannot add edge: one or both vertices do not exist");
+            }
+
+            EdgeId edge_id = m_next_edge_id++;
+
+            Edge forward{};
+            forward.source = u;
+            forward.target = v;
+            forward.weight = weight;
+            forward.id = edge_id;
+            forward.type = type;
+            forward.property = prop;
+            m_adjacency[u].push_back(forward);
+            if (type == EdgeType::Undirected) {
+                Edge reverse{};
+                reverse.source = v;
+                reverse.target = u;
+                reverse.weight = weight;
+                reverse.id = edge_id;
+                reverse.type = type;
+                reverse.property = prop;
+                m_adjacency[v].push_back(reverse);
+            }
+
+            m_edge_count++;
+            return edge_id;
+        }
+
+        template <typename VertexProperty, typename EdgeProperty>
+        template <typename EP, typename>
+        EdgeId Graph<VertexProperty, EdgeProperty>::add_edge(VertexId u, VertexId v,
+                                                             const EdgePropertyParamT<EdgeProperty> &prop) {
+            return add_edge(u, v, 1.0, EdgeType::Undirected, prop);
+        }
+
+        template <typename VertexProperty, typename EdgeProperty>
+        template <typename EP, typename>
+        EdgePropertyParamT<EdgeProperty> &Graph<VertexProperty, EdgeProperty>::edge_property(EdgeId e) {
+            for (auto &[vertex, edges] : m_adjacency) {
+                for (auto &edge : edges) {
+                    if (edge.id == e) {
+                        return edge.property;
+                    }
+                }
+            }
+            throw std::invalid_argument("Edge ID not found");
+        }
+
+        template <typename VertexProperty, typename EdgeProperty>
+        template <typename EP, typename>
+        const EdgePropertyParamT<EdgeProperty> &Graph<VertexProperty, EdgeProperty>::edge_property(EdgeId e) const {
+            for (const auto &[vertex, edges] : m_adjacency) {
+                for (const auto &edge : edges) {
+                    if (edge.id == e) {
+                        return edge.property;
+                    }
+                }
+            }
+            throw std::invalid_argument("Edge ID not found");
+        }
+
+        template <typename VertexProperty, typename EdgeProperty>
+        bool Graph<VertexProperty, EdgeProperty>::has_edge(VertexId u, VertexId v) const {
             auto it = m_adjacency.find(u);
             if (it == m_adjacency.end()) {
                 return false;
@@ -636,7 +865,8 @@ namespace graphix {
             return false;
         }
 
-        template <typename VertexProperty> double Graph<VertexProperty>::get_weight(EdgeId e) const {
+        template <typename VertexProperty, typename EdgeProperty>
+        double Graph<VertexProperty, EdgeProperty>::get_weight(EdgeId e) const {
             // Search through all adjacency lists to find edge with this ID
             for (const auto &[vertex, edges] : m_adjacency) {
                 for (const auto &edge : edges) {
@@ -648,7 +878,8 @@ namespace graphix {
             throw std::invalid_argument("Edge ID not found");
         }
 
-        template <typename VertexProperty> void Graph<VertexProperty>::set_weight(EdgeId e, double weight) {
+        template <typename VertexProperty, typename EdgeProperty>
+        void Graph<VertexProperty, EdgeProperty>::set_weight(EdgeId e, double weight) {
             // Update weight in both directions (undirected graph)
             bool found = false;
             for (auto &[vertex, edges] : m_adjacency) {
@@ -664,11 +895,14 @@ namespace graphix {
             }
         }
 
-        template <typename VertexProperty> size_t Graph<VertexProperty>::edge_count() const { return m_edge_count; }
+        template <typename VertexProperty, typename EdgeProperty>
+        size_t Graph<VertexProperty, EdgeProperty>::edge_count() const {
+            return m_edge_count;
+        }
 
         // Edge query functions
-        template <typename VertexProperty>
-        std::optional<EdgeId> Graph<VertexProperty>::get_edge(VertexId u, VertexId v) const {
+        template <typename VertexProperty, typename EdgeProperty>
+        std::optional<EdgeId> Graph<VertexProperty, EdgeProperty>::get_edge(VertexId u, VertexId v) const {
             auto it = m_adjacency.find(u);
             if (it == m_adjacency.end()) {
                 return std::nullopt;
@@ -681,8 +915,8 @@ namespace graphix {
             return std::nullopt;
         }
 
-        template <typename VertexProperty>
-        std::pair<EdgeId, bool> Graph<VertexProperty>::edge(VertexId u, VertexId v) const {
+        template <typename VertexProperty, typename EdgeProperty>
+        std::pair<EdgeId, bool> Graph<VertexProperty, EdgeProperty>::edge(VertexId u, VertexId v) const {
             auto opt = get_edge(u, v);
             if (opt.has_value()) {
                 return {opt.value(), true};
@@ -690,8 +924,9 @@ namespace graphix {
             return {0, false};
         }
 
-        template <typename VertexProperty>
-        typename Graph<VertexProperty>::VertexId Graph<VertexProperty>::source(EdgeId e) const {
+        template <typename VertexProperty, typename EdgeProperty>
+        typename Graph<VertexProperty, EdgeProperty>::VertexId
+        Graph<VertexProperty, EdgeProperty>::source(EdgeId e) const {
             // Search through all adjacency lists to find edge with this ID
             // Return the canonical direction (smaller vertex as source)
             VertexId found_src = 0, found_tgt = 0;
@@ -713,8 +948,9 @@ namespace graphix {
             return found_src;
         }
 
-        template <typename VertexProperty>
-        typename Graph<VertexProperty>::VertexId Graph<VertexProperty>::target(EdgeId e) const {
+        template <typename VertexProperty, typename EdgeProperty>
+        typename Graph<VertexProperty, EdgeProperty>::VertexId
+        Graph<VertexProperty, EdgeProperty>::target(EdgeId e) const {
             // Search through all adjacency lists to find edge with this ID
             // Return the canonical direction (smaller vertex as source)
             VertexId found_src = 0, found_tgt = 0;
@@ -736,7 +972,8 @@ namespace graphix {
             return found_tgt;
         }
 
-        template <typename VertexProperty> EdgeType Graph<VertexProperty>::get_edge_type(EdgeId e) const {
+        template <typename VertexProperty, typename EdgeProperty>
+        EdgeType Graph<VertexProperty, EdgeProperty>::get_edge_type(EdgeId e) const {
             // Search through all adjacency lists to find edge with this ID
             for (const auto &[vertex, edges] : m_adjacency) {
                 for (const auto &edge : edges) {
@@ -748,7 +985,8 @@ namespace graphix {
             throw std::invalid_argument("Edge ID not found");
         }
 
-        template <typename VertexProperty> std::vector<EdgeId> Graph<VertexProperty>::out_edges(VertexId v) const {
+        template <typename VertexProperty, typename EdgeProperty>
+        std::vector<EdgeId> Graph<VertexProperty, EdgeProperty>::out_edges(VertexId v) const {
             std::vector<EdgeId> result;
             auto it = m_adjacency.find(v);
             if (it != m_adjacency.end()) {
@@ -761,8 +999,9 @@ namespace graphix {
         }
 
         // Adjacency and neighbor queries
-        template <typename VertexProperty>
-        std::vector<typename Graph<VertexProperty>::VertexId> Graph<VertexProperty>::neighbors(VertexId v) const {
+        template <typename VertexProperty, typename EdgeProperty>
+        std::vector<typename Graph<VertexProperty, EdgeProperty>::VertexId>
+        Graph<VertexProperty, EdgeProperty>::neighbors(VertexId v) const {
             std::vector<VertexId> result;
             auto it = m_adjacency.find(v);
             if (it != m_adjacency.end()) {
@@ -774,7 +1013,8 @@ namespace graphix {
             return result;
         }
 
-        template <typename VertexProperty> size_t Graph<VertexProperty>::degree(VertexId v) const {
+        template <typename VertexProperty, typename EdgeProperty>
+        size_t Graph<VertexProperty, EdgeProperty>::degree(VertexId v) const {
             auto it = m_adjacency.find(v);
             if (it != m_adjacency.end()) {
                 return it->second.size();
@@ -783,8 +1023,9 @@ namespace graphix {
         }
 
         // Iterators
-        template <typename VertexProperty>
-        std::vector<typename Graph<VertexProperty>::VertexId> Graph<VertexProperty>::vertices() const {
+        template <typename VertexProperty, typename EdgeProperty>
+        std::vector<typename Graph<VertexProperty, EdgeProperty>::VertexId>
+        Graph<VertexProperty, EdgeProperty>::vertices() const {
             auto ids = m_vertices.all_ids();
             std::vector<VertexId> result;
             result.reserve(ids.size());
@@ -794,7 +1035,8 @@ namespace graphix {
             return result;
         }
 
-        template <typename VertexProperty> std::vector<EdgeDescriptor> Graph<VertexProperty>::edges() const {
+        template <typename VertexProperty, typename EdgeProperty>
+        std::vector<EdgeDescriptor> Graph<VertexProperty, EdgeProperty>::edges() const {
             std::vector<EdgeDescriptor> result;
             result.reserve(m_edge_count);
 
@@ -815,14 +1057,15 @@ namespace graphix {
         }
 
         // Graph modification
-        template <typename VertexProperty> void Graph<VertexProperty>::clear() {
+        template <typename VertexProperty, typename EdgeProperty> void Graph<VertexProperty, EdgeProperty>::clear() {
             m_vertices = Store<VertexProperty>();
             m_adjacency.clear();
             m_next_edge_id = 0;
             m_edge_count = 0;
         }
 
-        template <typename VertexProperty> void Graph<VertexProperty>::remove_edge(EdgeId e) {
+        template <typename VertexProperty, typename EdgeProperty>
+        void Graph<VertexProperty, EdgeProperty>::remove_edge(EdgeId e) {
             // Find and remove edges with this ID from both directions
             for (auto &[vertex, edges] : m_adjacency) {
                 auto it = std::remove_if(edges.begin(), edges.end(), [e](const Edge &edge) { return edge.id == e; });
@@ -833,7 +1076,8 @@ namespace graphix {
             m_edge_count--;
         }
 
-        template <typename VertexProperty> void Graph<VertexProperty>::remove_edge(VertexId u, VertexId v) {
+        template <typename VertexProperty, typename EdgeProperty>
+        void Graph<VertexProperty, EdgeProperty>::remove_edge(VertexId u, VertexId v) {
             // Find edge ID first
             auto it_u = m_adjacency.find(u);
             if (it_u != m_adjacency.end()) {
@@ -846,7 +1090,8 @@ namespace graphix {
             }
         }
 
-        template <typename VertexProperty> void Graph<VertexProperty>::remove_vertex(VertexId v) {
+        template <typename VertexProperty, typename EdgeProperty>
+        void Graph<VertexProperty, EdgeProperty>::remove_vertex(VertexId v) {
             if (!has_vertex(v)) {
                 return;
             }
@@ -883,158 +1128,134 @@ namespace graphix {
         // ============================================================================
 
         // Vertex count
-        template <typename VertexProperty> inline size_t num_vertices(const Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline size_t num_vertices(const Graph<VertexProperty, EdgeProperty> &g) {
             return g.vertex_count();
         }
 
-        inline size_t num_vertices(const Graph<void> &g) { return g.vertex_count(); }
-
         // Edge count
-        template <typename VertexProperty> inline size_t num_edges(const Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline size_t num_edges(const Graph<VertexProperty, EdgeProperty> &g) {
             return g.edge_count();
         }
 
-        inline size_t num_edges(const Graph<void> &g) { return g.edge_count(); }
-
         // Add vertex
-        template <typename VertexProperty>
-        inline typename Graph<VertexProperty>::VertexId add_vertex(const VertexProperty &prop,
-                                                                   Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline typename Graph<VertexProperty, EdgeProperty>::VertexId
+        add_vertex(const VertexProperty &prop, Graph<VertexProperty, EdgeProperty> &g) {
             return g.add_vertex(prop);
         }
 
-        inline Graph<void>::VertexId add_vertex(Graph<void> &g) { return g.add_vertex(); }
+        template <typename EdgeProperty>
+        inline typename Graph<void, EdgeProperty>::VertexId add_vertex(Graph<void, EdgeProperty> &g) {
+            return g.add_vertex();
+        }
 
         // Add edge
-        template <typename VertexProperty>
-        inline EdgeId add_edge(typename Graph<VertexProperty>::VertexId u, typename Graph<VertexProperty>::VertexId v,
-                               double weight, Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline EdgeId add_edge(typename Graph<VertexProperty, EdgeProperty>::VertexId u,
+                               typename Graph<VertexProperty, EdgeProperty>::VertexId v, double weight,
+                               Graph<VertexProperty, EdgeProperty> &g) {
             return g.add_edge(u, v, weight);
         }
 
-        inline EdgeId add_edge(Graph<void>::VertexId u, Graph<void>::VertexId v, double weight, Graph<void> &g) {
-            return g.add_edge(u, v, weight);
-        }
-
-        template <typename VertexProperty>
-        inline EdgeId add_edge(typename Graph<VertexProperty>::VertexId u, typename Graph<VertexProperty>::VertexId v,
-                               Graph<VertexProperty> &g) {
-            return g.add_edge(u, v);
-        }
-
-        inline EdgeId add_edge(Graph<void>::VertexId u, Graph<void>::VertexId v, Graph<void> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline EdgeId add_edge(typename Graph<VertexProperty, EdgeProperty>::VertexId u,
+                               typename Graph<VertexProperty, EdgeProperty>::VertexId v,
+                               Graph<VertexProperty, EdgeProperty> &g) {
             return g.add_edge(u, v);
         }
 
         // Vertex degree
-        template <typename VertexProperty>
-        inline size_t degree(typename Graph<VertexProperty>::VertexId v, const Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline size_t degree(typename Graph<VertexProperty, EdgeProperty>::VertexId v,
+                             const Graph<VertexProperty, EdgeProperty> &g) {
             return g.degree(v);
         }
 
-        inline size_t degree(Graph<void>::VertexId v, const Graph<void> &g) { return g.degree(v); }
-
         // Get neighbors
-        template <typename VertexProperty>
-        inline std::vector<typename Graph<VertexProperty>::VertexId>
-        neighbors(typename Graph<VertexProperty>::VertexId v, const Graph<VertexProperty> &g) {
-            return g.neighbors(v);
-        }
-
-        inline std::vector<Graph<void>::VertexId> neighbors(Graph<void>::VertexId v, const Graph<void> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline std::vector<typename Graph<VertexProperty, EdgeProperty>::VertexId>
+        neighbors(typename Graph<VertexProperty, EdgeProperty>::VertexId v,
+                  const Graph<VertexProperty, EdgeProperty> &g) {
             return g.neighbors(v);
         }
 
         // Get all vertices
-        template <typename VertexProperty>
-        inline std::vector<typename Graph<VertexProperty>::VertexId> vertices(const Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline std::vector<typename Graph<VertexProperty, EdgeProperty>::VertexId>
+        vertices(const Graph<VertexProperty, EdgeProperty> &g) {
             return g.vertices();
         }
 
-        inline std::vector<Graph<void>::VertexId> vertices(const Graph<void> &g) { return g.vertices(); }
-
         // Get all edges
-        template <typename VertexProperty> inline std::vector<EdgeDescriptor> edges(const Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline std::vector<EdgeDescriptor> edges(const Graph<VertexProperty, EdgeProperty> &g) {
             return g.edges();
         }
 
-        inline std::vector<EdgeDescriptor> edges(const Graph<void> &g) { return g.edges(); }
-
         // Clear graph
-        template <typename VertexProperty> inline void clear_graph(Graph<VertexProperty> &g) { g.clear(); }
-
-        inline void clear_graph(Graph<void> &g) { g.clear(); }
+        template <typename VertexProperty, typename EdgeProperty>
+        inline void clear_graph(Graph<VertexProperty, EdgeProperty> &g) {
+            g.clear();
+        }
 
         // Remove vertex
-        template <typename VertexProperty>
-        inline void remove_vertex(typename Graph<VertexProperty>::VertexId v, Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline void remove_vertex(typename Graph<VertexProperty, EdgeProperty>::VertexId v,
+                                  Graph<VertexProperty, EdgeProperty> &g) {
             g.remove_vertex(v);
         }
 
-        inline void remove_vertex(Graph<void>::VertexId v, Graph<void> &g) { g.remove_vertex(v); }
-
         // Remove edge by ID
-        template <typename VertexProperty> inline void remove_edge(EdgeId e, Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline void remove_edge(EdgeId e, Graph<VertexProperty, EdgeProperty> &g) {
             g.remove_edge(e);
         }
 
-        inline void remove_edge(EdgeId e, Graph<void> &g) { g.remove_edge(e); }
-
         // Remove edge by vertices
-        template <typename VertexProperty>
-        inline void remove_edge(typename Graph<VertexProperty>::VertexId u, typename Graph<VertexProperty>::VertexId v,
-                                Graph<VertexProperty> &g) {
-            g.remove_edge(u, v);
-        }
-
-        inline void remove_edge(Graph<void>::VertexId u, Graph<void>::VertexId v, Graph<void> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline void remove_edge(typename Graph<VertexProperty, EdgeProperty>::VertexId u,
+                                typename Graph<VertexProperty, EdgeProperty>::VertexId v,
+                                Graph<VertexProperty, EdgeProperty> &g) {
             g.remove_edge(u, v);
         }
 
         // Edge query functions
-        template <typename VertexProperty>
-        inline std::optional<EdgeId> get_edge(typename Graph<VertexProperty>::VertexId u,
-                                              typename Graph<VertexProperty>::VertexId v,
-                                              const Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline std::optional<EdgeId> get_edge(typename Graph<VertexProperty, EdgeProperty>::VertexId u,
+                                              typename Graph<VertexProperty, EdgeProperty>::VertexId v,
+                                              const Graph<VertexProperty, EdgeProperty> &g) {
             return g.get_edge(u, v);
         }
 
-        inline std::optional<EdgeId> get_edge(Graph<void>::VertexId u, Graph<void>::VertexId v, const Graph<void> &g) {
-            return g.get_edge(u, v);
-        }
-
-        template <typename VertexProperty>
-        inline std::pair<EdgeId, bool> edge(typename Graph<VertexProperty>::VertexId u,
-                                            typename Graph<VertexProperty>::VertexId v,
-                                            const Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline std::pair<EdgeId, bool> edge(typename Graph<VertexProperty, EdgeProperty>::VertexId u,
+                                            typename Graph<VertexProperty, EdgeProperty>::VertexId v,
+                                            const Graph<VertexProperty, EdgeProperty> &g) {
             return g.edge(u, v);
         }
 
-        inline std::pair<EdgeId, bool> edge(Graph<void>::VertexId u, Graph<void>::VertexId v, const Graph<void> &g) {
-            return g.edge(u, v);
-        }
-
-        template <typename VertexProperty>
-        inline typename Graph<VertexProperty>::VertexId source(EdgeId e, const Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline typename Graph<VertexProperty, EdgeProperty>::VertexId
+        source(EdgeId e, const Graph<VertexProperty, EdgeProperty> &g) {
             return g.source(e);
         }
 
-        inline Graph<void>::VertexId source(EdgeId e, const Graph<void> &g) { return g.source(e); }
-
-        template <typename VertexProperty>
-        inline typename Graph<VertexProperty>::VertexId target(EdgeId e, const Graph<VertexProperty> &g) {
+        template <typename VertexProperty, typename EdgeProperty>
+        inline typename Graph<VertexProperty, EdgeProperty>::VertexId
+        target(EdgeId e, const Graph<VertexProperty, EdgeProperty> &g) {
             return g.target(e);
         }
-
-        inline Graph<void>::VertexId target(EdgeId e, const Graph<void> &g) { return g.target(e); }
 
         // ============================================================================
         // Serialization Template Implementations
         // ============================================================================
 
-        template <typename VertexProperty>
+        template <typename VertexProperty, typename EdgeProperty>
         template <typename PropertyWriter>
-        void Graph<VertexProperty>::save_dot(const std::string &filename, PropertyWriter write_prop) const {
+        void Graph<VertexProperty, EdgeProperty>::save_dot(const std::string &filename,
+                                                           PropertyWriter write_prop) const {
             std::ofstream out(filename);
             if (!out.is_open()) {
                 throw std::runtime_error("Failed to open file for writing: " + filename);
@@ -1082,15 +1303,16 @@ namespace graphix {
             out.close();
         }
 
-        template <typename VertexProperty>
+        template <typename VertexProperty, typename EdgeProperty>
         template <typename PropertyReader>
-        Graph<VertexProperty> Graph<VertexProperty>::load_dot(const std::string &filename, PropertyReader read_prop) {
+        Graph<VertexProperty, EdgeProperty> Graph<VertexProperty, EdgeProperty>::load_dot(const std::string &filename,
+                                                                                          PropertyReader read_prop) {
             std::ifstream in(filename);
             if (!in.is_open()) {
                 throw std::runtime_error("Failed to open file for reading: " + filename);
             }
 
-            Graph<VertexProperty> g;
+            Graph<VertexProperty, EdgeProperty> g;
             std::map<std::string, VertexId> id_map;
             bool is_directed = false;
 

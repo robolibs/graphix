@@ -18,6 +18,31 @@ namespace graphix {
                 }
             };
 
+            template <typename VertexProperty, typename EdgeProperty>
+            inline typename Graph<VertexProperty, EdgeProperty>::VertexId
+            copy_vertex_to_result(const Graph<VertexProperty, EdgeProperty> &graph,
+                                  Graph<VertexProperty, EdgeProperty> &result,
+                                  typename Graph<VertexProperty, EdgeProperty>::VertexId v) {
+                if constexpr (std::is_same_v<VertexProperty, void>) {
+                    return result.add_vertex();
+                } else {
+                    return result.add_vertex(graph[v]);
+                }
+            }
+
+            template <typename VertexProperty, typename EdgeProperty>
+            inline void copy_edge_to_result(const Graph<VertexProperty, EdgeProperty> &graph,
+                                            Graph<VertexProperty, EdgeProperty> &result,
+                                            typename Graph<VertexProperty, EdgeProperty>::VertexId src,
+                                            typename Graph<VertexProperty, EdgeProperty>::VertexId tgt,
+                                            const EdgeDescriptor &edge_desc) {
+                if constexpr (std::is_void_v<EdgeProperty>) {
+                    result.add_edge(src, tgt, edge_desc.weight, edge_desc.type);
+                } else {
+                    result.add_edge(src, tgt, edge_desc.weight, edge_desc.type, graph.edge_property(edge_desc.id));
+                }
+            }
+
             // ========================================================================
             // Graph Transpose/Reverse - Reverse all edge directions
             // ========================================================================
@@ -26,21 +51,18 @@ namespace graphix {
             // For directed edges: u -> v becomes v -> u
             // For undirected edges: edges remain unchanged
             // Vertex properties are preserved
-            template <typename VertexProperty>
-            inline Graph<VertexProperty> transpose(const Graph<VertexProperty> &graph) {
-                Graph<VertexProperty> result;
+            template <typename VertexProperty, typename EdgeProperty>
+            inline Graph<VertexProperty, EdgeProperty> transpose(const Graph<VertexProperty, EdgeProperty> &graph) {
+                Graph<VertexProperty, EdgeProperty> result;
 
                 // Copy all vertices with their properties
-                std::unordered_map<typename Graph<VertexProperty>::VertexId, typename Graph<VertexProperty>::VertexId>
+                std::unordered_map<typename Graph<VertexProperty, EdgeProperty>::VertexId,
+                                   typename Graph<VertexProperty, EdgeProperty>::VertexId>
                     old_to_new;
 
                 for (auto v : graph.vertices()) {
-                    typename Graph<VertexProperty>::VertexId new_v;
-                    if constexpr (std::is_same_v<VertexProperty, void>) {
-                        new_v = result.add_vertex();
-                    } else {
-                        new_v = result.add_vertex(graph[v]);
-                    }
+                    typename Graph<VertexProperty, EdgeProperty>::VertexId new_v =
+                        copy_vertex_to_result(graph, result, v);
                     old_to_new[v] = new_v;
                 }
 
@@ -50,40 +72,9 @@ namespace graphix {
                     auto tgt = old_to_new[edge_desc.target];
 
                     if (edge_desc.type == EdgeType::Directed) {
-                        // Reverse directed edges: u -> v becomes v -> u
-                        result.add_edge(tgt, src, edge_desc.weight, EdgeType::Directed);
+                        copy_edge_to_result(graph, result, tgt, src, edge_desc);
                     } else {
-                        // Undirected edges remain undirected
-                        result.add_edge(src, tgt, edge_desc.weight, EdgeType::Undirected);
-                    }
-                }
-
-                return result;
-            }
-
-            // Specialization for void (no vertex properties)
-            inline Graph<void> transpose(const Graph<void> &graph) {
-                Graph<void> result;
-
-                // Create mapping from old to new vertex IDs
-                std::unordered_map<Graph<void>::VertexId, Graph<void>::VertexId> old_to_new;
-
-                for (auto v : graph.vertices()) {
-                    auto new_v = result.add_vertex();
-                    old_to_new[v] = new_v;
-                }
-
-                // Add edges with reversed direction (for directed edges)
-                for (const auto &edge_desc : graph.edges()) {
-                    auto src = old_to_new[edge_desc.source];
-                    auto tgt = old_to_new[edge_desc.target];
-
-                    if (edge_desc.type == EdgeType::Directed) {
-                        // Reverse directed edges: u -> v becomes v -> u
-                        result.add_edge(tgt, src, edge_desc.weight, EdgeType::Directed);
-                    } else {
-                        // Undirected edges remain undirected
-                        result.add_edge(src, tgt, edge_desc.weight, EdgeType::Undirected);
+                        copy_edge_to_result(graph, result, src, tgt, edge_desc);
                     }
                 }
 
@@ -96,13 +87,13 @@ namespace graphix {
 
             // Extract induced subgraph from a set of vertices
             // An induced subgraph contains all edges between vertices in the set
-            template <typename VertexProperty>
-            inline Graph<VertexProperty>
-            induced_subgraph(const Graph<VertexProperty> &graph,
-                             const std::unordered_set<typename Graph<VertexProperty>::VertexId> &vertex_set) {
+            template <typename VertexProperty, typename EdgeProperty>
+            inline Graph<VertexProperty, EdgeProperty> induced_subgraph(
+                const Graph<VertexProperty, EdgeProperty> &graph,
+                const std::unordered_set<typename Graph<VertexProperty, EdgeProperty>::VertexId> &vertex_set) {
 
-                using VertexId = typename Graph<VertexProperty>::VertexId;
-                Graph<VertexProperty> result;
+                using VertexId = typename Graph<VertexProperty, EdgeProperty>::VertexId;
+                Graph<VertexProperty, EdgeProperty> result;
 
                 // Map old vertex IDs to new vertex IDs
                 std::unordered_map<VertexId, VertexId> old_to_new;
@@ -110,12 +101,7 @@ namespace graphix {
                 // Add vertices that are in the set
                 for (auto v : graph.vertices()) {
                     if (vertex_set.count(v)) {
-                        VertexId new_v;
-                        if constexpr (std::is_same_v<VertexProperty, void>) {
-                            new_v = result.add_vertex();
-                        } else {
-                            new_v = result.add_vertex(graph[v]);
-                        }
+                        VertexId new_v = copy_vertex_to_result(graph, result, v);
                         old_to_new[v] = new_v;
                     }
                 }
@@ -125,7 +111,7 @@ namespace graphix {
                     if (vertex_set.count(edge_desc.source) && vertex_set.count(edge_desc.target)) {
                         auto src = old_to_new[edge_desc.source];
                         auto tgt = old_to_new[edge_desc.target];
-                        result.add_edge(src, tgt, edge_desc.weight, edge_desc.type);
+                        copy_edge_to_result(graph, result, src, tgt, edge_desc);
                     }
                 }
 
@@ -133,26 +119,26 @@ namespace graphix {
             }
 
             // Convenience overload taking a vector of vertices
-            template <typename VertexProperty>
-            inline Graph<VertexProperty>
-            induced_subgraph(const Graph<VertexProperty> &graph,
-                             const std::vector<typename Graph<VertexProperty>::VertexId> &vertices) {
+            template <typename VertexProperty, typename EdgeProperty>
+            inline Graph<VertexProperty, EdgeProperty>
+            induced_subgraph(const Graph<VertexProperty, EdgeProperty> &graph,
+                             const std::vector<typename Graph<VertexProperty, EdgeProperty>::VertexId> &vertices) {
 
-                std::unordered_set<typename Graph<VertexProperty>::VertexId> vertex_set(vertices.begin(),
-                                                                                        vertices.end());
+                std::unordered_set<typename Graph<VertexProperty, EdgeProperty>::VertexId> vertex_set(vertices.begin(),
+                                                                                                      vertices.end());
                 return induced_subgraph(graph, vertex_set);
             }
 
             // Edge subgraph - includes selected vertices and specific edges
             // Unlike induced subgraph, this allows specifying which edges to include
-            template <typename VertexProperty>
-            inline Graph<VertexProperty>
-            edge_subgraph(const Graph<VertexProperty> &graph,
-                          const std::unordered_set<typename Graph<VertexProperty>::VertexId> &vertex_set,
+            template <typename VertexProperty, typename EdgeProperty>
+            inline Graph<VertexProperty, EdgeProperty>
+            edge_subgraph(const Graph<VertexProperty, EdgeProperty> &graph,
+                          const std::unordered_set<typename Graph<VertexProperty, EdgeProperty>::VertexId> &vertex_set,
                           const std::unordered_set<size_t> &edge_set) {
 
-                using VertexId = typename Graph<VertexProperty>::VertexId;
-                Graph<VertexProperty> result;
+                using VertexId = typename Graph<VertexProperty, EdgeProperty>::VertexId;
+                Graph<VertexProperty, EdgeProperty> result;
 
                 // Map old vertex IDs to new vertex IDs
                 std::unordered_map<VertexId, VertexId> old_to_new;
@@ -160,12 +146,7 @@ namespace graphix {
                 // Add vertices that are in the set
                 for (auto v : graph.vertices()) {
                     if (vertex_set.count(v)) {
-                        VertexId new_v;
-                        if constexpr (std::is_same_v<VertexProperty, void>) {
-                            new_v = result.add_vertex();
-                        } else {
-                            new_v = result.add_vertex(graph[v]);
-                        }
+                        VertexId new_v = copy_vertex_to_result(graph, result, v);
                         old_to_new[v] = new_v;
                     }
                 }
@@ -176,7 +157,7 @@ namespace graphix {
                         vertex_set.count(edge_desc.target)) {
                         auto src = old_to_new[edge_desc.source];
                         auto tgt = old_to_new[edge_desc.target];
-                        result.add_edge(src, tgt, edge_desc.weight, edge_desc.type);
+                        copy_edge_to_result(graph, result, src, tgt, edge_desc);
                     }
                 }
 
@@ -340,10 +321,11 @@ namespace graphix {
 
             // Filter vertices by predicate function
             // Creates subgraph containing only vertices where predicate returns true
-            template <typename VertexProperty, typename Predicate>
-            inline Graph<VertexProperty> filter_vertices(const Graph<VertexProperty> &graph, Predicate pred) {
+            template <typename VertexProperty, typename EdgeProperty, typename Predicate>
+            inline Graph<VertexProperty, EdgeProperty> filter_vertices(const Graph<VertexProperty, EdgeProperty> &graph,
+                                                                       Predicate pred) {
 
-                using VertexId = typename Graph<VertexProperty>::VertexId;
+                using VertexId = typename Graph<VertexProperty, EdgeProperty>::VertexId;
                 std::unordered_set<VertexId> selected_vertices;
 
                 // Select vertices that match predicate
@@ -358,10 +340,11 @@ namespace graphix {
 
             // Filter edges by predicate function
             // Creates subgraph with same vertices but only edges matching predicate
-            template <typename VertexProperty, typename Predicate>
-            inline Graph<VertexProperty> filter_edges(const Graph<VertexProperty> &graph, Predicate pred) {
+            template <typename VertexProperty, typename EdgeProperty, typename Predicate>
+            inline Graph<VertexProperty, EdgeProperty> filter_edges(const Graph<VertexProperty, EdgeProperty> &graph,
+                                                                    Predicate pred) {
 
-                using VertexId = typename Graph<VertexProperty>::VertexId;
+                using VertexId = typename Graph<VertexProperty, EdgeProperty>::VertexId;
                 // EdgeId is globally defined as size_t in graph.hpp
                 using EdgeId = size_t;
 

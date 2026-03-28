@@ -5,6 +5,13 @@
 using namespace graphix::vertex;
 using namespace graphix::vertex::algorithms;
 
+namespace {
+struct EdgeInfo {
+    double max_speed = 0.0;
+    bool allow_stopping = false;
+};
+} // namespace
+
 TEST_SUITE("Graph Transformations - Transpose") {
 
     TEST_CASE("Transpose empty graph") {
@@ -535,5 +542,23 @@ TEST_SUITE("Graph Transformations - Edge Cases") {
         }
         CHECK(directed_count == 1);
         CHECK(undirected_count == 1);
+    }
+
+    TEST_CASE("Transpose preserves native edge properties") {
+        Graph<void, EdgeInfo> g;
+        auto v0 = g.add_vertex();
+        auto v1 = g.add_vertex();
+        auto e = g.add_edge(v0, v1, 5.0, EdgeType::Directed, EdgeInfo{30.0, true});
+
+        auto result = transpose(g);
+
+        auto edges = result.edges();
+        CHECK(edges.size() == 1);
+        CHECK(edges[0].weight == doctest::Approx(5.0));
+        CHECK(edges[0].type == EdgeType::Directed);
+        CHECK(result.edge_property(edges[0].id).max_speed == doctest::Approx(30.0));
+        CHECK(result.edge_property(edges[0].id).allow_stopping == true);
+
+        (void)e;
     }
 }
