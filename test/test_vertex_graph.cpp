@@ -8,6 +8,17 @@ struct Point {
     bool operator==(const Point &other) const { return x == other.x && y == other.y; }
 };
 
+struct EdgeInfo {
+    double max_speed = 0.0;
+    bool allow_stopping = false;
+    bool two_way_transport = false;
+
+    bool operator==(const EdgeInfo &other) const {
+        return max_speed == other.max_speed && allow_stopping == other.allow_stopping &&
+               two_way_transport == other.two_way_transport;
+    }
+};
+
 // ============================================================================
 // Step 1: Basic Graph Structure with Vertex Properties
 // ============================================================================
@@ -1353,4 +1364,38 @@ TEST_CASE("Edge queries after modification") {
     // source/target should still work for remaining edge
     CHECK(g.source(e2) == v2);
     CHECK(g.target(e2) == v3);
+}
+
+TEST_CASE("Graph supports native edge properties") {
+    graphix::vertex::Graph<int, EdgeInfo> g;
+
+    auto v1 = g.add_vertex(100);
+    auto v2 = g.add_vertex(200);
+
+    EdgeInfo info{30.0, true, false};
+    auto e = g.add_edge(v1, v2, 1.5, graphix::vertex::EdgeType::Directed, info);
+
+    CHECK(g[v1] == 100);
+    CHECK(g[v2] == 200);
+    CHECK(g.get_weight(e) == doctest::Approx(1.5));
+    CHECK(g.edge_property(e) == info);
+
+    g.edge_property(e).max_speed = 42.0;
+    CHECK(g.edge_property(e).max_speed == doctest::Approx(42.0));
+    CHECK(g.edge_property(e).allow_stopping == true);
+    CHECK(g.edge_property(e).two_way_transport == false);
+}
+
+TEST_CASE("Graph edge properties default construct on backward-compatible add_edge") {
+    graphix::vertex::Graph<void, EdgeInfo> g;
+
+    auto v1 = g.add_vertex();
+    auto v2 = g.add_vertex();
+
+    auto e = g.add_edge(v1, v2, 2.0, graphix::vertex::EdgeType::Undirected);
+
+    CHECK(g.get_weight(e) == doctest::Approx(2.0));
+    CHECK(g.edge_property(e).max_speed == doctest::Approx(0.0));
+    CHECK(g.edge_property(e).allow_stopping == false);
+    CHECK(g.edge_property(e).two_way_transport == false);
 }

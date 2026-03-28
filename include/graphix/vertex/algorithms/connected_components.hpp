@@ -1,13 +1,9 @@
 #pragma once
 
+#include "graphix/vertex/graph.hpp"
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-// Forward declarations
-namespace graphix::vertex {
-    template <typename VertexProperty> class Graph;
-}
 
 namespace graphix::vertex::algorithms {
 

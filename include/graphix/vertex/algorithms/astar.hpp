@@ -1,5 +1,6 @@
 #pragma once
 
+#include "graphix/vertex/graph.hpp"
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -11,9 +12,6 @@
 
 namespace graphix {
     namespace vertex {
-
-        // Forward declarations (algorithms work with any Graph type)
-        template <typename VertexProperty> class Graph;
 
         namespace algorithms {
 
