@@ -14,13 +14,13 @@ fn build_problem() -> (Graph<dyn NonlinearFactor>, Values) {
         SE2PriorFactor::new(
             X(0).into(),
             SE2d::new(0.0, 0.0, 0.0),
-            Vec3d::from_array([0.01, 0.01, 0.01]),
+            Vec3d::from([0.01, 0.01, 0.01]),
         )
         .unwrap(),
     ) as Rc<dyn NonlinearFactor>);
 
-    let odom_sigma = Vec3d::from_array([0.1, 0.1, 0.05]);
-    let loop_sigma = Vec3d::from_array([0.05, 0.05, 0.05]);
+    let odom_sigma = Vec3d::from([0.1, 0.1, 0.05]);
+    let loop_sigma = Vec3d::from([0.05, 0.05, 0.05]);
     let edges = [
         (X(0), X(1), SE2d::new(0.0, 2.05, 0.0)),
         (X(1), X(2), SE2d::new(PI / 2.0, 0.0, 2.03)),

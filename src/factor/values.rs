@@ -1,5 +1,6 @@
 use std::any::Any;
-use std::collections::BTreeMap;
+
+use datapod::trees::OrderedMap;
 
 use crate::core::Key;
 
@@ -23,7 +24,7 @@ impl<T: Clone + Send + Sync + 'static> Value for GenericValue<T> {
 
 #[derive(Default)]
 pub struct Values {
-    values: BTreeMap<Key, Box<dyn Value>>,
+    values: OrderedMap<Key, Box<dyn Value>>,
 }
 
 pub struct ValuesIter<'a> {
@@ -40,7 +41,7 @@ impl std::fmt::Debug for Values {
 
 impl Clone for Values {
     fn clone(&self) -> Self {
-        let mut values = BTreeMap::new();
+        let mut values = OrderedMap::new();
         for (key, value) in &self.values {
             values.insert(*key, value.clone_box());
         }

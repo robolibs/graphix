@@ -1,16 +1,20 @@
-use glam::DVec2;
+use datapod::Point;
 
 use graphix::vertex::algorithms::dijkstra;
 use graphix::vertex::spatial::knn_graph_2d;
 
+fn p(x: f64, y: f64) -> Point {
+    Point::new(x, y, 0.0)
+}
+
 fn main() {
     let points = vec![
-        DVec2::new(0.0, 0.0),
-        DVec2::new(1.0, 0.2),
-        DVec2::new(2.0, 0.0),
-        DVec2::new(3.0, 0.6),
-        DVec2::new(4.0, 1.0),
-        DVec2::new(5.0, 1.1),
+        p(0.0, 0.0),
+        p(1.0, 0.2),
+        p(2.0, 0.0),
+        p(3.0, 0.6),
+        p(4.0, 1.0),
+        p(5.0, 1.1),
     ];
 
     let graph = knn_graph_2d(points, 2, |p| *p).expect("failed to build k-NN graph");

@@ -1,11 +1,15 @@
 use std::f64::consts::PI;
 
-use glam::DVec2;
+use datapod::Point;
 
 use graphix::X;
 use graphix::factor::{
     LevenbergMarquardtOptimizer, PoseGraph2d, SE2d, cauchy_loss, huber_loss, tukey_loss,
 };
+
+fn p(x: f64, y: f64) -> Point {
+    Point::new(x, y, 0.0)
+}
 
 fn distance_mm(pose: SE2d, x: f64, y: f64) -> f64 {
     ((pose.x() - x).powi(2) + (pose.y() - y).powi(2)).sqrt() * 1000.0
@@ -16,65 +20,59 @@ fn build_base_problem() -> PoseGraph2d {
     problem
         .insert_pose(X(0).into(), SE2d::identity())
         .unwrap()
-        .insert_pose(
-            X(1).into(),
-            SE2d::from_translation_angle(DVec2::new(2.0, 0.0), 0.0),
-        )
+        .insert_pose(X(1).into(), SE2d::from_translation_angle(p(2.0, 0.0), 0.0))
         .unwrap()
         .insert_pose(
             X(2).into(),
-            SE2d::from_translation_angle(DVec2::new(2.0, 2.0), PI / 2.0),
+            SE2d::from_translation_angle(p(2.0, 2.0), PI / 2.0),
         )
         .unwrap()
-        .insert_pose(
-            X(3).into(),
-            SE2d::from_translation_angle(DVec2::new(0.0, 2.0), PI),
-        )
+        .insert_pose(X(3).into(), SE2d::from_translation_angle(p(0.0, 2.0), PI))
         .unwrap()
         .insert_pose(
             X(4).into(),
-            SE2d::from_translation_angle(DVec2::ZERO, 3.0 * PI / 2.0),
+            SE2d::from_translation_angle(Point::default(), 3.0 * PI / 2.0),
         )
         .unwrap()
-        .add_prior(X(0).into(), SE2d::identity(), DVec2::splat(0.01), 0.01)
+        .add_prior(X(0).into(), SE2d::identity(), p(0.01, 0.01), 0.01)
         .unwrap()
         .add_between(
             X(0).into(),
             X(1).into(),
-            SE2d::from_translation_angle(DVec2::new(2.0, 0.0), 0.0),
-            DVec2::splat(0.1),
+            SE2d::from_translation_angle(p(2.0, 0.0), 0.0),
+            p(0.1, 0.1),
             0.05,
         )
         .unwrap()
         .add_between(
             X(1).into(),
             X(2).into(),
-            SE2d::from_translation_angle(DVec2::new(0.0, 2.0), PI / 2.0),
-            DVec2::splat(0.1),
+            SE2d::from_translation_angle(p(0.0, 2.0), PI / 2.0),
+            p(0.1, 0.1),
             0.05,
         )
         .unwrap()
         .add_between(
             X(2).into(),
             X(3).into(),
-            SE2d::from_translation_angle(DVec2::new(-2.0, 0.0), PI / 2.0),
-            DVec2::splat(0.1),
+            SE2d::from_translation_angle(p(-2.0, 0.0), PI / 2.0),
+            p(0.1, 0.1),
             0.05,
         )
         .unwrap()
         .add_between(
             X(3).into(),
             X(4).into(),
-            SE2d::from_translation_angle(DVec2::new(0.0, -2.0), PI / 2.0),
-            DVec2::splat(0.1),
+            SE2d::from_translation_angle(p(0.0, -2.0), PI / 2.0),
+            p(0.1, 0.1),
             0.05,
         )
         .unwrap()
         .add_between(
             X(4).into(),
             X(0).into(),
-            SE2d::from_translation_angle(DVec2::ZERO, PI / 2.0),
-            DVec2::splat(0.05),
+            SE2d::from_translation_angle(Point::default(), PI / 2.0),
+            p(0.05, 0.05),
             0.05,
         )
         .unwrap();
@@ -89,8 +87,8 @@ fn main() {
         .add_between(
             X(2).into(),
             X(0).into(),
-            SE2d::from_translation_angle(DVec2::new(-0.5, -0.5), -PI),
-            DVec2::splat(0.05),
+            SE2d::from_translation_angle(p(-0.5, -0.5), -PI),
+            p(0.05, 0.05),
             0.05,
         )
         .unwrap();
@@ -100,8 +98,8 @@ fn main() {
         .add_between_with_loss(
             X(2).into(),
             X(0).into(),
-            SE2d::from_translation_angle(DVec2::new(-0.5, -0.5), -PI),
-            DVec2::splat(0.05),
+            SE2d::from_translation_angle(p(-0.5, -0.5), -PI),
+            p(0.05, 0.05),
             0.05,
             huber_loss(1.345),
         )
@@ -112,8 +110,8 @@ fn main() {
         .add_between_with_loss(
             X(2).into(),
             X(0).into(),
-            SE2d::from_translation_angle(DVec2::new(-0.5, -0.5), -PI),
-            DVec2::splat(0.05),
+            SE2d::from_translation_angle(p(-0.5, -0.5), -PI),
+            p(0.05, 0.05),
             0.05,
             cauchy_loss(2.3849),
         )
@@ -124,22 +122,17 @@ fn main() {
         .add_between_with_loss(
             X(2).into(),
             X(0).into(),
-            SE2d::from_translation_angle(DVec2::new(-0.5, -0.5), -PI),
-            DVec2::splat(0.05),
+            SE2d::from_translation_angle(p(-0.5, -0.5), -PI),
+            p(0.05, 0.05),
             0.05,
             tukey_loss(4.6851),
         )
         .unwrap();
 
-    let plain_initial = plain.initial_values();
-    let huber_initial = huber_graph.initial_values();
-    let cauchy_initial = cauchy_graph.initial_values();
-    let tukey_initial = tukey_graph.initial_values();
-
-    let plain_result = optimizer.optimize(plain.graph(), plain_initial);
-    let huber_result = optimizer.optimize(huber_graph.graph(), huber_initial);
-    let cauchy_result = optimizer.optimize(cauchy_graph.graph(), cauchy_initial);
-    let tukey_result = optimizer.optimize(tukey_graph.graph(), tukey_initial);
+    let plain_result = optimizer.optimize(plain.graph(), plain.initial_values());
+    let huber_result = optimizer.optimize(huber_graph.graph(), huber_graph.initial_values());
+    let cauchy_result = optimizer.optimize(cauchy_graph.graph(), cauchy_graph.initial_values());
+    let tukey_result = optimizer.optimize(tukey_graph.graph(), tukey_graph.initial_values());
 
     let plain_pose = *plain_result.values.at::<SE2d>(X(2).into()).unwrap();
     let huber_pose = *huber_result.values.at::<SE2d>(X(2).into()).unwrap();

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use glam::DVec2;
+use datapod::Point;
 use kiddo::{KdTree, SquaredEuclidean};
 
 use super::{EdgeType, Graph, VertexId};
@@ -17,7 +17,7 @@ fn build_tree<VertexProperty, EdgeProperty, F>(
     position: F,
 ) -> KdTree<f64, 2>
 where
-    F: Fn(VertexId<VertexProperty>, &VertexProperty) -> DVec2,
+    F: Fn(VertexId<VertexProperty>, &VertexProperty) -> Point,
 {
     let mut tree = KdTree::new();
     for vertex in graph.vertices() {
@@ -30,9 +30,9 @@ where
     tree
 }
 
-fn build_point_tree<Point, F>(points: &[Point], position: F) -> KdTree<f64, 2>
+fn build_point_tree<T, F>(points: &[T], position: F) -> KdTree<f64, 2>
 where
-    F: Copy + Fn(&Point) -> DVec2,
+    F: Copy + Fn(&T) -> Point,
 {
     let mut tree = KdTree::new();
     for (index, point) in points.iter().enumerate() {
@@ -44,11 +44,11 @@ where
 
 pub fn nearest_vertex_2d<VertexProperty, EdgeProperty, F>(
     graph: &Graph<VertexProperty, EdgeProperty>,
-    query: DVec2,
+    query: Point,
     position: F,
 ) -> Result<Option<(VertexId<VertexProperty>, f64)>, String>
 where
-    F: Fn(VertexId<VertexProperty>, &VertexProperty) -> DVec2,
+    F: Fn(VertexId<VertexProperty>, &VertexProperty) -> Point,
 {
     if graph.vertex_count() == 0 {
         return Ok(None);
@@ -63,12 +63,12 @@ where
 
 pub fn k_nearest_vertices_2d<VertexProperty, EdgeProperty, F>(
     graph: &Graph<VertexProperty, EdgeProperty>,
-    query: DVec2,
+    query: Point,
     k: usize,
     position: F,
 ) -> Result<Vec<(VertexId<VertexProperty>, f64)>, String>
 where
-    F: Fn(VertexId<VertexProperty>, &VertexProperty) -> DVec2,
+    F: Fn(VertexId<VertexProperty>, &VertexProperty) -> Point,
 {
     if k == 0 || graph.vertex_count() == 0 {
         return Ok(Vec::new());
@@ -83,12 +83,12 @@ where
 
 pub fn vertices_within_radius_2d<VertexProperty, EdgeProperty, F>(
     graph: &Graph<VertexProperty, EdgeProperty>,
-    query: DVec2,
+    query: Point,
     radius: f64,
     position: F,
 ) -> Result<Vec<(VertexId<VertexProperty>, f64)>, String>
 where
-    F: Fn(VertexId<VertexProperty>, &VertexProperty) -> DVec2,
+    F: Fn(VertexId<VertexProperty>, &VertexProperty) -> Point,
 {
     if radius < 0.0 || graph.vertex_count() == 0 {
         return Ok(Vec::new());
@@ -109,7 +109,7 @@ pub fn connect_k_nearest_neighbors_2d<VertexProperty, EdgeProperty, F, P>(
     make_edge_property: P,
 ) -> Result<usize, String>
 where
-    F: Copy + Fn(VertexId<VertexProperty>, &VertexProperty) -> DVec2,
+    F: Copy + Fn(VertexId<VertexProperty>, &VertexProperty) -> Point,
     P: Copy + Fn(VertexId<VertexProperty>, VertexId<VertexProperty>, f64) -> EdgeProperty,
     EdgeProperty: Clone,
 {
@@ -160,7 +160,7 @@ pub fn connect_vertices_within_radius_2d<VertexProperty, EdgeProperty, F, P>(
     make_edge_property: P,
 ) -> Result<usize, String>
 where
-    F: Copy + Fn(VertexId<VertexProperty>, &VertexProperty) -> DVec2,
+    F: Copy + Fn(VertexId<VertexProperty>, &VertexProperty) -> Point,
     P: Copy + Fn(VertexId<VertexProperty>, VertexId<VertexProperty>, f64) -> EdgeProperty,
     EdgeProperty: Clone,
 {
@@ -209,7 +209,7 @@ pub fn knn_graph_2d<VertexProperty, F>(
     position: F,
 ) -> Result<Graph<VertexProperty, ()>, String>
 where
-    F: Copy + Fn(&VertexProperty) -> DVec2,
+    F: Copy + Fn(&VertexProperty) -> Point,
 {
     let mut graph = Graph::new();
     for point in points {
@@ -231,7 +231,7 @@ pub fn radius_graph_2d<VertexProperty, F>(
     position: F,
 ) -> Result<Graph<VertexProperty, ()>, String>
 where
-    F: Copy + Fn(&VertexProperty) -> DVec2,
+    F: Copy + Fn(&VertexProperty) -> Point,
 {
     let mut graph = Graph::new();
     for point in points {
@@ -254,8 +254,8 @@ pub fn nearest_neighbor_correspondences_2d<SourcePoint, TargetPoint, FS, FT>(
     target_position: FT,
 ) -> Result<Vec<Correspondence2d>, String>
 where
-    FS: Copy + Fn(&SourcePoint) -> DVec2,
-    FT: Copy + Fn(&TargetPoint) -> DVec2,
+    FS: Copy + Fn(&SourcePoint) -> Point,
+    FT: Copy + Fn(&TargetPoint) -> Point,
 {
     if sources.is_empty() || targets.is_empty() {
         return Ok(Vec::new());
@@ -283,8 +283,8 @@ pub fn radius_limited_correspondences_2d<SourcePoint, TargetPoint, FS, FT>(
     target_position: FT,
 ) -> Result<Vec<Correspondence2d>, String>
 where
-    FS: Copy + Fn(&SourcePoint) -> DVec2,
-    FT: Copy + Fn(&TargetPoint) -> DVec2,
+    FS: Copy + Fn(&SourcePoint) -> Point,
+    FT: Copy + Fn(&TargetPoint) -> Point,
 {
     if radius < 0.0 || sources.is_empty() || targets.is_empty() {
         return Ok(Vec::new());
@@ -315,8 +315,8 @@ pub fn mutual_nearest_correspondences_2d<SourcePoint, TargetPoint, FS, FT>(
     target_position: FT,
 ) -> Result<Vec<Correspondence2d>, String>
 where
-    FS: Copy + Fn(&SourcePoint) -> DVec2,
-    FT: Copy + Fn(&TargetPoint) -> DVec2,
+    FS: Copy + Fn(&SourcePoint) -> Point,
+    FT: Copy + Fn(&TargetPoint) -> Point,
 {
     if sources.is_empty() || targets.is_empty() {
         return Ok(Vec::new());

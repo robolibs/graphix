@@ -93,7 +93,7 @@ fn se2_between_linearization_handles_exact_measurement_and_error_cases() {
         X(0).into(),
         X(1).into(),
         SE2d::new(0.0, 1.0, 0.0),
-        Vec3d::from_array([0.1, 0.1, 0.1]),
+        Vec3d::from([0.1, 0.1, 0.1]),
     )
     .unwrap();
 
@@ -122,7 +122,7 @@ fn se2_linearization_is_numerically_stable_for_small_sigmas_and_large_values() {
     let small_sigma = SE2PriorFactor::new(
         X(0).into(),
         SE2d::new(0.0, 0.0, 0.0),
-        Vec3d::from_array([0.001, 0.001, 0.001]),
+        Vec3d::from([0.001, 0.001, 0.001]),
     )
     .unwrap();
     let mut near_zero = Values::new();
@@ -136,7 +136,7 @@ fn se2_linearization_is_numerically_stable_for_small_sigmas_and_large_values() {
     let large_value = SE2PriorFactor::new(
         X(0).into(),
         SE2d::new(3.14, 1000.0, 2000.0),
-        Vec3d::from_array([10.0, 10.0, 0.1]),
+        Vec3d::from([10.0, 10.0, 0.1]),
     )
     .unwrap();
     let mut far = Values::new();
@@ -152,7 +152,7 @@ fn se2_prior_linearization_matches_expected_analytical_scaling() {
     let factor = SE2PriorFactor::new(
         X(0).into(),
         SE2d::new(0.0, 1.0, 2.0),
-        Vec3d::from_array([0.5, 0.5, 0.5]),
+        Vec3d::from([0.5, 0.5, 0.5]),
     )
     .unwrap();
 

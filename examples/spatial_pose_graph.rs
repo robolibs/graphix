@@ -1,11 +1,15 @@
-use glam::DVec2;
+use datapod::Point;
 
 use graphix::X;
 use graphix::factor::{GaussNewtonOptimizer, PoseGraph2d, SE2d};
 use graphix::vertex::algorithms::dijkstra;
 use graphix::vertex::spatial::{knn_graph_2d, nearest_vertex_2d};
 
-fn heading(points: &[DVec2], index: usize) -> f64 {
+fn p(x: f64, y: f64) -> Point {
+    Point::new(x, y, 0.0)
+}
+
+fn heading(points: &[Point], index: usize) -> f64 {
     let current = points[index];
     let neighbor = if index + 1 < points.len() {
         points[index + 1]
@@ -16,7 +20,7 @@ fn heading(points: &[DVec2], index: usize) -> f64 {
     delta.y.atan2(delta.x)
 }
 
-fn mean_position_error_mm(poses: &[SE2d], expected: &[DVec2]) -> f64 {
+fn mean_position_error_mm(poses: &[SE2d], expected: &[Point]) -> f64 {
     let total = poses
         .iter()
         .zip(expected.iter())
@@ -27,24 +31,22 @@ fn mean_position_error_mm(poses: &[SE2d], expected: &[DVec2]) -> f64 {
 
 fn main() {
     let points = vec![
-        DVec2::new(0.0, 0.0),
-        DVec2::new(1.0, 0.1),
-        DVec2::new(2.0, 0.0),
-        DVec2::new(3.0, 0.4),
-        DVec2::new(4.0, 0.9),
-        DVec2::new(5.0, 1.1),
-        DVec2::new(2.2, 1.5),
-        DVec2::new(3.5, 1.7),
+        p(0.0, 0.0),
+        p(1.0, 0.1),
+        p(2.0, 0.0),
+        p(3.0, 0.4),
+        p(4.0, 0.9),
+        p(5.0, 1.1),
+        p(2.2, 1.5),
+        p(3.5, 1.7),
     ];
 
     let graph = knn_graph_2d(points, 3, |p| *p).expect("failed to build k-NN graph");
-    let start_query = DVec2::new(-0.2, 0.0);
-    let goal_query = DVec2::new(5.1, 1.0);
-    let start = nearest_vertex_2d(&graph, start_query, |_, p| *p)
+    let start = nearest_vertex_2d(&graph, p(-0.2, 0.0), |_, p| *p)
         .expect("nearest start failed")
         .expect("graph should not be empty")
         .0;
-    let goal = nearest_vertex_2d(&graph, goal_query, |_, p| *p)
+    let goal = nearest_vertex_2d(&graph, p(5.1, 1.0), |_, p| *p)
         .expect("nearest goal failed")
         .expect("graph should not be empty")
         .0;
@@ -68,7 +70,7 @@ fn main() {
     for (index, exact_pose) in exact_poses.iter().enumerate() {
         let noise = 0.08 * index as f64;
         let noisy = SE2d::from_translation_angle(
-            DVec2::new(exact_pose.x() + 0.15 * noise, exact_pose.y() - 0.10 * noise),
+            p(exact_pose.x() + 0.15 * noise, exact_pose.y() - 0.10 * noise),
             exact_pose.angle() + 0.03 * noise,
         );
         problem
@@ -77,7 +79,7 @@ fn main() {
     }
 
     problem
-        .add_prior(X(0).into(), exact_poses[0], DVec2::splat(0.01), 0.01)
+        .add_prior(X(0).into(), exact_poses[0], p(0.01, 0.01), 0.01)
         .expect("failed to add prior");
 
     for (index, window) in exact_poses.windows(2).enumerate() {
@@ -87,7 +89,7 @@ fn main() {
                 X(index as u64).into(),
                 X(index as u64 + 1).into(),
                 measured,
-                DVec2::splat(0.05),
+                p(0.05, 0.05),
                 0.03,
             )
             .expect("failed to add odometry factor");

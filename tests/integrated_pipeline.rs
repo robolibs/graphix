@@ -1,4 +1,4 @@
-use glam::DVec2;
+use datapod::Point;
 
 use graphix::X;
 use graphix::factor::{GaussNewtonOptimizer, PoseGraph2d, SE2d};
@@ -7,7 +7,11 @@ use graphix::vertex::spatial::{
     knn_graph_2d, mutual_nearest_correspondences_2d, nearest_vertex_2d,
 };
 
-fn heading(points: &[DVec2], index: usize) -> f64 {
+fn p(x: f64, y: f64) -> Point {
+    Point::new(x, y, 0.0)
+}
+
+fn heading(points: &[Point], index: usize) -> f64 {
     let current = points[index];
     let neighbor = if index + 1 < points.len() {
         points[index + 1]
@@ -18,7 +22,7 @@ fn heading(points: &[DVec2], index: usize) -> f64 {
     delta.y.atan2(delta.x)
 }
 
-fn mean_position_error(poses: &[SE2d], expected: &[DVec2]) -> f64 {
+fn mean_position_error(poses: &[SE2d], expected: &[Point]) -> f64 {
     poses
         .iter()
         .zip(expected.iter())
@@ -30,22 +34,22 @@ fn mean_position_error(poses: &[SE2d], expected: &[DVec2]) -> f64 {
 #[test]
 fn spatial_route_can_seed_and_optimize_pose_graph() {
     let points = vec![
-        DVec2::new(0.0, 0.0),
-        DVec2::new(1.0, 0.1),
-        DVec2::new(2.0, 0.0),
-        DVec2::new(3.0, 0.4),
-        DVec2::new(4.0, 0.9),
-        DVec2::new(5.0, 1.1),
-        DVec2::new(2.2, 1.5),
-        DVec2::new(3.5, 1.7),
+        p(0.0, 0.0),
+        p(1.0, 0.1),
+        p(2.0, 0.0),
+        p(3.0, 0.4),
+        p(4.0, 0.9),
+        p(5.0, 1.1),
+        p(2.2, 1.5),
+        p(3.5, 1.7),
     ];
 
     let graph = knn_graph_2d(points, 3, |p| *p).unwrap();
-    let start = nearest_vertex_2d(&graph, DVec2::new(-0.2, 0.0), |_, p| *p)
+    let start = nearest_vertex_2d(&graph, p(-0.2, 0.0), |_, p| *p)
         .unwrap()
         .unwrap()
         .0;
-    let goal = nearest_vertex_2d(&graph, DVec2::new(5.1, 1.0), |_, p| *p)
+    let goal = nearest_vertex_2d(&graph, p(5.1, 1.0), |_, p| *p)
         .unwrap()
         .unwrap()
         .0;
@@ -76,14 +80,14 @@ fn spatial_route_can_seed_and_optimize_pose_graph() {
     for (index, exact_pose) in exact_poses.iter().enumerate() {
         let noise = 0.08 * index as f64;
         let noisy = SE2d::from_translation_angle(
-            DVec2::new(exact_pose.x() + 0.15 * noise, exact_pose.y() - 0.10 * noise),
+            p(exact_pose.x() + 0.15 * noise, exact_pose.y() - 0.10 * noise),
             exact_pose.angle() + 0.03 * noise,
         );
         problem.insert_pose(X(index as u64).into(), noisy).unwrap();
     }
 
     problem
-        .add_prior(X(0).into(), exact_poses[0], DVec2::splat(0.01), 0.01)
+        .add_prior(X(0).into(), exact_poses[0], p(0.01, 0.01), 0.01)
         .unwrap();
     for (index, window) in exact_poses.windows(2).enumerate() {
         problem
@@ -91,7 +95,7 @@ fn spatial_route_can_seed_and_optimize_pose_graph() {
                 X(index as u64).into(),
                 X(index as u64 + 1).into(),
                 window[0].between(window[1]),
-                DVec2::splat(0.05),
+                p(0.05, 0.05),
                 0.03,
             )
             .unwrap();
@@ -118,18 +122,8 @@ fn spatial_route_can_seed_and_optimize_pose_graph() {
 
 #[test]
 fn correspondence_matches_can_drive_pose_graph_constraints() {
-    let predicted_landmarks = vec![
-        DVec2::new(0.0, 0.0),
-        DVec2::new(2.0, 0.0),
-        DVec2::new(4.0, 0.0),
-        DVec2::new(8.0, 8.0),
-    ];
-    let observed_landmarks = vec![
-        DVec2::new(0.05, -0.02),
-        DVec2::new(2.04, 0.01),
-        DVec2::new(3.97, -0.03),
-        DVec2::new(20.0, 20.0),
-    ];
+    let predicted_landmarks = vec![p(0.0, 0.0), p(2.0, 0.0), p(4.0, 0.0), p(8.0, 8.0)];
+    let observed_landmarks = vec![p(0.05, -0.02), p(2.04, 0.01), p(3.97, -0.03), p(20.0, 20.0)];
 
     let correspondences = mutual_nearest_correspondences_2d(
         &predicted_landmarks,
@@ -153,10 +147,10 @@ fn correspondence_matches_can_drive_pose_graph_constraints() {
     problem
         .insert_pose(
             X(0).into(),
-            SE2d::from_translation_angle(DVec2::new(0.3, -0.2), 0.05),
+            SE2d::from_translation_angle(p(0.3, -0.2), 0.05),
         )
         .unwrap()
-        .add_prior(X(0).into(), SE2d::identity(), DVec2::splat(0.5), 0.2)
+        .add_prior(X(0).into(), SE2d::identity(), p(0.5, 0.5), 0.2)
         .unwrap();
 
     let mut expected_translations = Vec::new();
@@ -166,14 +160,14 @@ fn correspondence_matches_can_drive_pose_graph_constraints() {
         let observed = observed_landmarks[corr.target_index];
         let translation = observed - predicted;
         expected_translations.push(translation);
-        let initial_pose = SE2d::from_translation_angle(predicted + DVec2::new(0.2, -0.1), 0.02);
-        before_errors.push((initial_pose.translation() - translation).length());
+        let initial_pose = SE2d::from_translation_angle(predicted + p(0.2, -0.1), 0.02);
+        before_errors.push((initial_pose.translation() - translation).magnitude());
         problem
             .add_between(
                 X(0).into(),
                 X((corr.source_index + 1) as u64).into(),
                 SE2d::from_translation_angle(translation, 0.0),
-                DVec2::splat(0.05),
+                p(0.05, 0.05),
                 0.1,
             )
             .unwrap()
@@ -188,7 +182,7 @@ fn correspondence_matches_can_drive_pose_graph_constraints() {
             .at::<SE2d>(X((corr_index + 1) as u64).into())
             .unwrap();
         let expected = expected_translations[corr_index];
-        let position_error = (pose.translation() - expected).length();
+        let position_error = (pose.translation() - expected).magnitude();
         assert!(position_error < before_errors[corr_index]);
         assert!(position_error < 1e-3);
     }

@@ -1,4 +1,4 @@
-use glam::DVec2;
+use datapod::Point;
 
 use graphix::vertex::EdgeType;
 use graphix::vertex::Graph;
@@ -10,25 +10,29 @@ use graphix::vertex::spatial::{
     vertices_within_radius_2d,
 };
 
+fn p(x: f64, y: f64) -> Point {
+    Point::new(x, y, 0.0)
+}
+
 #[test]
 fn nearest_vertex_queries_work_for_2d_property_graphs() {
-    let mut g = Graph::<DVec2, ()>::new();
-    let v0 = g.add_vertex(DVec2::new(0.0, 0.0));
-    let v1 = g.add_vertex(DVec2::new(10.0, 0.0));
-    let v2 = g.add_vertex(DVec2::new(5.0, 5.0));
+    let mut g = Graph::<Point, ()>::new();
+    let v0 = g.add_vertex(p(0.0, 0.0));
+    let v1 = g.add_vertex(p(10.0, 0.0));
+    let v2 = g.add_vertex(p(5.0, 5.0));
 
-    let nearest = nearest_vertex_2d(&g, DVec2::new(4.0, 4.0), |_, p| *p)
+    let nearest = nearest_vertex_2d(&g, p(4.0, 4.0), |_, p| *p)
         .unwrap()
         .unwrap();
     assert_eq!(nearest.0, v2);
     assert!(nearest.1 < 2.0);
 
-    let knn = k_nearest_vertices_2d(&g, DVec2::new(3.0, 1.0), 2, |_, p| *p).unwrap();
+    let knn = k_nearest_vertices_2d(&g, p(3.0, 1.0), 2, |_, p| *p).unwrap();
     assert_eq!(knn.len(), 2);
     assert_eq!(knn[0].0, v0);
     assert!(knn[0].1 <= knn[1].1);
 
-    let within = vertices_within_radius_2d(&g, DVec2::new(0.0, 0.0), 7.2, |_, p| *p).unwrap();
+    let within = vertices_within_radius_2d(&g, p(0.0, 0.0), 7.2, |_, p| *p).unwrap();
     let ids: Vec<_> = within.into_iter().map(|(vertex, _)| vertex).collect();
     assert!(ids.contains(&v0));
     assert!(ids.contains(&v2));
@@ -37,19 +41,19 @@ fn nearest_vertex_queries_work_for_2d_property_graphs() {
 
 #[test]
 fn spatial_queries_handle_empty_graph_and_zero_k() {
-    let g = Graph::<DVec2, ()>::new();
+    let g = Graph::<Point, ()>::new();
     assert!(
-        nearest_vertex_2d(&g, DVec2::ZERO, |_, p| *p)
+        nearest_vertex_2d(&g, Point::default(), |_, p| *p)
             .unwrap()
             .is_none()
     );
     assert!(
-        k_nearest_vertices_2d(&g, DVec2::ZERO, 3, |_, p| *p)
+        k_nearest_vertices_2d(&g, Point::default(), 3, |_, p| *p)
             .unwrap()
             .is_empty()
     );
     assert!(
-        vertices_within_radius_2d(&g, DVec2::ZERO, 1.0, |_, p| *p)
+        vertices_within_radius_2d(&g, Point::default(), 1.0, |_, p| *p)
             .unwrap()
             .is_empty()
     );
@@ -57,12 +61,7 @@ fn spatial_queries_handle_empty_graph_and_zero_k() {
 
 #[test]
 fn knn_and_radius_graph_builders_create_distance_weighted_graphs() {
-    let points = vec![
-        DVec2::new(0.0, 0.0),
-        DVec2::new(1.0, 0.0),
-        DVec2::new(2.0, 0.0),
-        DVec2::new(5.0, 0.0),
-    ];
+    let points = vec![p(0.0, 0.0), p(1.0, 0.0), p(2.0, 0.0), p(5.0, 0.0)];
 
     let knn = knn_graph_2d(points.clone(), 1, |p| *p).unwrap();
     assert_eq!(knn.vertex_count(), 4);
@@ -82,11 +81,11 @@ fn knn_and_radius_graph_builders_create_distance_weighted_graphs() {
 
 #[test]
 fn spatial_connectors_can_build_pathfinding_graphs() {
-    let mut g = Graph::<DVec2, ()>::new();
-    let a = g.add_vertex(DVec2::new(0.0, 0.0));
-    let _b = g.add_vertex(DVec2::new(1.0, 0.0));
-    let _c = g.add_vertex(DVec2::new(2.0, 0.0));
-    let d = g.add_vertex(DVec2::new(3.0, 0.0));
+    let mut g = Graph::<Point, ()>::new();
+    let a = g.add_vertex(p(0.0, 0.0));
+    let _b = g.add_vertex(p(1.0, 0.0));
+    let _c = g.add_vertex(p(2.0, 0.0));
+    let d = g.add_vertex(p(3.0, 0.0));
 
     let added =
         connect_k_nearest_neighbors_2d(&mut g, 2, EdgeType::Undirected, |_, p| *p, |_, _, _| ())
@@ -102,10 +101,10 @@ fn spatial_connectors_can_build_pathfinding_graphs() {
 
 #[test]
 fn radius_connector_respects_radius_and_custom_edge_properties() {
-    let mut g = Graph::<DVec2, &'static str>::new();
-    let v0 = g.add_vertex(DVec2::new(0.0, 0.0));
-    let v1 = g.add_vertex(DVec2::new(0.5, 0.0));
-    let v2 = g.add_vertex(DVec2::new(3.0, 0.0));
+    let mut g = Graph::<Point, &'static str>::new();
+    let v0 = g.add_vertex(p(0.0, 0.0));
+    let v1 = g.add_vertex(p(0.5, 0.0));
+    let v2 = g.add_vertex(p(3.0, 0.0));
 
     let added = connect_vertices_within_radius_2d(
         &mut g,
@@ -124,16 +123,8 @@ fn radius_connector_respects_radius_and_custom_edge_properties() {
 
 #[test]
 fn nearest_neighbor_correspondences_match_expected_targets() {
-    let sources = vec![
-        DVec2::new(0.1, 0.0),
-        DVec2::new(1.9, 0.1),
-        DVec2::new(4.2, 0.0),
-    ];
-    let targets = vec![
-        DVec2::new(0.0, 0.0),
-        DVec2::new(2.0, 0.0),
-        DVec2::new(4.0, 0.0),
-    ];
+    let sources = vec![p(0.1, 0.0), p(1.9, 0.1), p(4.2, 0.0)];
+    let targets = vec![p(0.0, 0.0), p(2.0, 0.0), p(4.0, 0.0)];
 
     let correspondences =
         nearest_neighbor_correspondences_2d(&sources, &targets, |p| *p, |p| *p).unwrap();
@@ -147,16 +138,8 @@ fn nearest_neighbor_correspondences_match_expected_targets() {
 
 #[test]
 fn radius_and_mutual_correspondence_filters_drop_weak_matches() {
-    let sources = vec![
-        DVec2::new(0.0, 0.0),
-        DVec2::new(1.0, 0.0),
-        DVec2::new(5.0, 5.0),
-    ];
-    let targets = vec![
-        DVec2::new(0.1, 0.0),
-        DVec2::new(1.1, 0.0),
-        DVec2::new(1.2, 0.0),
-    ];
+    let sources = vec![p(0.0, 0.0), p(1.0, 0.0), p(5.0, 5.0)];
+    let targets = vec![p(0.1, 0.0), p(1.1, 0.0), p(1.2, 0.0)];
 
     let limited =
         radius_limited_correspondences_2d(&sources, &targets, 0.35, |p| *p, |p| *p).unwrap();
@@ -174,8 +157,8 @@ fn radius_and_mutual_correspondence_filters_drop_weak_matches() {
 
 #[test]
 fn correspondence_helpers_handle_empty_inputs() {
-    let empty: Vec<DVec2> = Vec::new();
-    let targets = vec![DVec2::ZERO];
+    let empty: Vec<Point> = Vec::new();
+    let targets = vec![Point::default()];
 
     assert!(
         nearest_neighbor_correspondences_2d(&empty, &targets, |p| *p, |p| *p)

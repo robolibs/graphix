@@ -1,28 +1,27 @@
 use std::f64::consts::FRAC_PI_2;
 use std::rc::Rc;
 
-use glam::DVec2;
+use datapod::Point;
 
 use graphix::X;
 use graphix::factor::{Graph, NonlinearFactor, SE2BetweenFactor, SE2PriorFactor, SE2d, Values};
 
+fn p(x: f64, y: f64) -> Point {
+    Point::new(x, y, 0.0)
+}
+
 fn main() {
     let mut graph: Graph<dyn NonlinearFactor> = Graph::new();
     graph.add(Rc::new(
-        SE2PriorFactor::from_translation_sigmas(
-            X(0).into(),
-            SE2d::identity(),
-            DVec2::splat(0.1),
-            0.1,
-        )
-        .unwrap(),
+        SE2PriorFactor::from_translation_sigmas(X(0).into(), SE2d::identity(), p(0.1, 0.1), 0.1)
+            .unwrap(),
     ) as Rc<dyn NonlinearFactor>);
     graph.add(Rc::new(
         SE2BetweenFactor::from_translation_sigmas(
             X(0).into(),
             X(1).into(),
-            SE2d::from_translation_angle(DVec2::new(1.0, 0.0), 0.0),
-            DVec2::splat(0.2),
+            SE2d::from_translation_angle(p(1.0, 0.0), 0.0),
+            p(0.2, 0.2),
             0.1,
         )
         .unwrap(),
@@ -31,8 +30,8 @@ fn main() {
         SE2BetweenFactor::from_translation_sigmas(
             X(1).into(),
             X(2).into(),
-            SE2d::from_translation_angle(DVec2::ZERO, FRAC_PI_2),
-            DVec2::splat(0.2),
+            SE2d::from_translation_angle(Point::default(), FRAC_PI_2),
+            p(0.2, 0.2),
             0.1,
         )
         .unwrap(),
@@ -41,15 +40,12 @@ fn main() {
     let mut values = Values::new();
     values.insert(X(0).into(), SE2d::identity()).unwrap();
     values
-        .insert(
-            X(1).into(),
-            SE2d::from_translation_angle(DVec2::new(1.0, 0.0), 0.0),
-        )
+        .insert(X(1).into(), SE2d::from_translation_angle(p(1.0, 0.0), 0.0))
         .unwrap();
     values
         .insert(
             X(2).into(),
-            SE2d::from_translation_angle(DVec2::new(1.0, 0.0), FRAC_PI_2),
+            SE2d::from_translation_angle(p(1.0, 0.0), FRAC_PI_2),
         )
         .unwrap();
 

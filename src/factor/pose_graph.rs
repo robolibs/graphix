@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use glam::DVec2;
+use datapod::Point;
 
 use crate::core::Key;
 
@@ -58,7 +58,7 @@ impl PoseGraph2d {
         &mut self,
         key: Key,
         prior: SE2d,
-        translation_sigma: DVec2,
+        translation_sigma: Point,
         rotation_sigma: f64,
     ) -> Result<&mut Self, String> {
         let factor =
@@ -73,12 +73,12 @@ impl PoseGraph2d {
         x: f64,
         y: f64,
         theta: f64,
-        translation_sigma: DVec2,
+        translation_sigma: Point,
         rotation_sigma: f64,
     ) -> Result<&mut Self, String> {
         self.add_prior(
             key,
-            SE2d::from_translation_angle(DVec2::new(x, y), theta),
+            SE2d::from_translation_angle(Point::new(x, y, 0.0), theta),
             translation_sigma,
             rotation_sigma,
         )
@@ -89,7 +89,7 @@ impl PoseGraph2d {
         from: Key,
         to: Key,
         measured: SE2d,
-        translation_sigma: DVec2,
+        translation_sigma: Point,
         rotation_sigma: f64,
     ) -> Result<&mut Self, String> {
         let factor = SE2BetweenFactor::from_translation_sigmas(
@@ -110,13 +110,13 @@ impl PoseGraph2d {
         x: f64,
         y: f64,
         theta: f64,
-        translation_sigma: DVec2,
+        translation_sigma: Point,
         rotation_sigma: f64,
     ) -> Result<&mut Self, String> {
         self.add_between(
             from,
             to,
-            SE2d::from_translation_angle(DVec2::new(x, y), theta),
+            SE2d::from_translation_angle(Point::new(x, y, 0.0), theta),
             translation_sigma,
             rotation_sigma,
         )
@@ -127,7 +127,7 @@ impl PoseGraph2d {
         from: Key,
         to: Key,
         measured: SE2d,
-        translation_sigma: DVec2,
+        translation_sigma: Point,
         rotation_sigma: f64,
         loss: Arc<dyn LossFunction>,
     ) -> Result<&mut Self, String> {
@@ -150,14 +150,14 @@ impl PoseGraph2d {
         x: f64,
         y: f64,
         theta: f64,
-        translation_sigma: DVec2,
+        translation_sigma: Point,
         rotation_sigma: f64,
         loss: Arc<dyn LossFunction>,
     ) -> Result<&mut Self, String> {
         self.add_between_with_loss(
             from,
             to,
-            SE2d::from_translation_angle(DVec2::new(x, y), theta),
+            SE2d::from_translation_angle(Point::new(x, y, 0.0), theta),
             translation_sigma,
             rotation_sigma,
             loss,

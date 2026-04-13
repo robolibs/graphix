@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use glam::DVec2;
+use datapod::Point;
 
 use crate::core::Key;
 
@@ -235,7 +235,7 @@ impl SE2PriorFactor {
     pub fn from_translation_sigmas(
         key: Key,
         prior: SE2d,
-        translation_sigma: DVec2,
+        translation_sigma: Point,
         rotation_sigma: f64,
     ) -> Result<Self, String> {
         Self::new(key, prior, se2_sigmas(translation_sigma, rotation_sigma))
@@ -329,7 +329,7 @@ impl SE2BetweenFactor {
         key1: Key,
         key2: Key,
         measured: SE2d,
-        translation_sigma: DVec2,
+        translation_sigma: Point,
         rotation_sigma: f64,
     ) -> Result<Self, String> {
         Self::new(
@@ -1054,7 +1054,7 @@ where
                     } else if self.template_values.at::<Vec3d>(info.key).is_ok() {
                         values.insert(
                             info.key,
-                            Vec3d::from_array([
+                            Vec3d::from([
                                 params[info.offset],
                                 params[info.offset + 1],
                                 params[info.offset + 2],
@@ -1337,7 +1337,7 @@ fn apply_step(values: &Values, ordering: &[VariableInfo], step: &[f64]) -> Resul
             }
             3 => {
                 if let Ok(current) = updated.at::<SE2d>(info.key).copied() {
-                    let delta = Vec3d::from_array([
+                    let delta = Vec3d::from([
                         step[info.offset],
                         step[info.offset + 1],
                         step[info.offset + 2],
@@ -1345,7 +1345,7 @@ fn apply_step(values: &Values, ordering: &[VariableInfo], step: &[f64]) -> Resul
                     updated.erase(info.key);
                     updated.insert(info.key, current.retract(delta))?;
                 } else if let Ok(current) = updated.at::<Vec3d>(info.key).copied() {
-                    let next = Vec3d::from_array([
+                    let next = Vec3d::from([
                         current[0] + step[info.offset],
                         current[1] + step[info.offset + 1],
                         current[2] + step[info.offset + 2],
@@ -1380,7 +1380,7 @@ fn perturb_value(values: &Values, key: Key, dim: usize, epsilon: f64) -> Result<
         }
         delta[dim] = epsilon;
         perturbed.erase(key);
-        perturbed.insert(key, current.retract(Vec3d::from_array(delta)))?;
+        perturbed.insert(key, current.retract(Vec3d::from(delta)))?;
         return Ok(perturbed);
     }
 
@@ -1391,7 +1391,7 @@ fn perturb_value(values: &Values, key: Key, dim: usize, epsilon: f64) -> Result<
         let mut next = [current[0], current[1], current[2]];
         next[dim] += epsilon;
         perturbed.erase(key);
-        perturbed.insert(key, Vec3d::from_array(next))?;
+        perturbed.insert(key, Vec3d::from(next))?;
         return Ok(perturbed);
     }
 

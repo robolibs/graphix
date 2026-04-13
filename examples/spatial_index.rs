@@ -1,4 +1,4 @@
-use glam::DVec2;
+use datapod::Point;
 
 use graphix::vertex::EdgeType;
 use graphix::vertex::Graph;
@@ -7,13 +7,17 @@ use graphix::vertex::spatial::{
     connect_k_nearest_neighbors_2d, k_nearest_vertices_2d, nearest_vertex_2d,
 };
 
+fn p(x: f64, y: f64) -> Point {
+    Point::new(x, y, 0.0)
+}
+
 fn main() {
-    let mut graph = Graph::<DVec2, ()>::new();
-    let a = graph.add_vertex(DVec2::new(0.0, 0.0));
-    let _b = graph.add_vertex(DVec2::new(1.0, 0.0));
-    let _c = graph.add_vertex(DVec2::new(2.0, 0.0));
-    let _d = graph.add_vertex(DVec2::new(3.0, 1.0));
-    let e = graph.add_vertex(DVec2::new(4.0, 1.0));
+    let mut graph = Graph::<Point, ()>::new();
+    let a = graph.add_vertex(p(0.0, 0.0));
+    let _b = graph.add_vertex(p(1.0, 0.0));
+    let _c = graph.add_vertex(p(2.0, 0.0));
+    let _d = graph.add_vertex(p(3.0, 1.0));
+    let e = graph.add_vertex(p(4.0, 1.0));
 
     let added = connect_k_nearest_neighbors_2d(
         &mut graph,
@@ -25,7 +29,7 @@ fn main() {
     .unwrap();
     println!("constructed spatial graph with {added} edges");
 
-    let query = DVec2::new(4.0, 4.0);
+    let query = p(4.0, 4.0);
     let nearest = nearest_vertex_2d(&graph, query, |_, p| *p)
         .unwrap()
         .unwrap();

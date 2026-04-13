@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 use std::rc::Rc;
 
-use glam::DVec2;
+use datapod::Point;
 
 use graphix::X;
 use graphix::factor::{
@@ -11,8 +11,7 @@ use graphix::factor::{
 #[test]
 fn se2_prior_factor_has_zero_error_at_prior() {
     let prior = SE2d::new(PI / 4.0, 5.0, 10.0);
-    let factor =
-        SE2PriorFactor::new(X(0).into(), prior, Vec3d::from_array([1.0, 1.0, 1.0])).unwrap();
+    let factor = SE2PriorFactor::new(X(0).into(), prior, Vec3d::from([1.0, 1.0, 1.0])).unwrap();
 
     let mut values = Values::new();
     values.insert(X(0).into(), prior).unwrap();
@@ -25,7 +24,7 @@ fn se2_prior_factor_respects_sigma_weighting() {
     let factor = SE2PriorFactor::new(
         X(0).into(),
         SE2d::new(0.0, 0.0, 0.0),
-        Vec3d::from_array([0.1, 0.1, 0.1]),
+        Vec3d::from([0.1, 0.1, 0.1]),
     )
     .unwrap();
 
@@ -43,7 +42,7 @@ fn se2_between_factor_uses_local_frame_translation() {
         X(0).into(),
         X(1).into(),
         SE2d::new(0.0, 1.0, 0.0),
-        Vec3d::from_array([1.0, 1.0, 1.0]),
+        Vec3d::from([1.0, 1.0, 1.0]),
     )
     .unwrap();
 
@@ -88,7 +87,7 @@ fn se2_nonlinear_factor_graph_accumulates_error() {
         SE2PriorFactor::new(
             X(0).into(),
             SE2d::new(0.0, 0.0, 0.0),
-            Vec3d::from_array([0.1, 0.1, 0.1]),
+            Vec3d::from([0.1, 0.1, 0.1]),
         )
         .unwrap(),
     )));
@@ -97,7 +96,7 @@ fn se2_nonlinear_factor_graph_accumulates_error() {
             X(0).into(),
             X(1).into(),
             SE2d::new(0.0, 1.0, 0.0),
-            Vec3d::from_array([0.1, 0.1, 0.1]),
+            Vec3d::from([0.1, 0.1, 0.1]),
         )
         .unwrap(),
     )));
@@ -120,7 +119,7 @@ fn se2_factor_construction_rejects_nonpositive_sigmas() {
         SE2PriorFactor::new(
             X(0).into(),
             SE2d::new(0.0, 0.0, 0.0),
-            Vec3d::from_array([0.0, 1.0, 1.0]),
+            Vec3d::from([0.0, 1.0, 1.0]),
         )
         .is_err()
     );
@@ -128,7 +127,7 @@ fn se2_factor_construction_rejects_nonpositive_sigmas() {
         SE2PriorFactor::new(
             X(0).into(),
             SE2d::new(0.0, 0.0, 0.0),
-            Vec3d::from_array([1.0, -1.0, 1.0]),
+            Vec3d::from([1.0, -1.0, 1.0]),
         )
         .is_err()
     );
@@ -137,7 +136,7 @@ fn se2_factor_construction_rejects_nonpositive_sigmas() {
             X(0).into(),
             X(1).into(),
             SE2d::new(0.0, 0.0, 0.0),
-            Vec3d::from_array([1.0, 1.0, 0.0]),
+            Vec3d::from([1.0, 1.0, 0.0]),
         )
         .is_err()
     );
@@ -148,14 +147,14 @@ fn se2_factors_expose_loss_function_state() {
     let mut prior = SE2PriorFactor::new(
         X(0).into(),
         SE2d::new(0.0, 0.0, 0.0),
-        Vec3d::from_array([1.0, 1.0, 1.0]),
+        Vec3d::from([1.0, 1.0, 1.0]),
     )
     .unwrap();
     let mut between = SE2BetweenFactor::new(
         X(0).into(),
         X(1).into(),
         SE2d::new(0.0, 1.0, 0.0),
-        Vec3d::from_array([1.0, 1.0, 1.0]),
+        Vec3d::from([1.0, 1.0, 1.0]),
     )
     .unwrap();
 
@@ -179,19 +178,19 @@ fn se2_factor_convenience_constructors_match_explicit_sigmas() {
     let prior = SE2PriorFactor::from_translation_sigmas(
         X(0).into(),
         SE2d::identity(),
-        DVec2::new(0.1, 0.2),
+        Point::new(0.1, 0.2, 0.0),
         0.3,
     )
     .unwrap();
     let between = SE2BetweenFactor::from_translation_sigmas(
         X(0).into(),
         X(1).into(),
-        SE2d::from_translation_angle(DVec2::new(1.0, 0.0), PI / 2.0),
-        DVec2::new(0.4, 0.5),
+        SE2d::from_translation_angle(Point::new(1.0, 0.0, 0.0), PI / 2.0),
+        Point::new(0.4, 0.5, 0.0),
         0.6,
     )
     .unwrap();
 
-    assert_eq!(prior.sigmas(), Vec3d::new(0.1, 0.2, 0.3));
-    assert_eq!(between.sigmas(), Vec3d::new(0.4, 0.5, 0.6));
+    assert_eq!(prior.sigmas(), Vec3d::from([0.1, 0.2, 0.3]));
+    assert_eq!(between.sigmas(), Vec3d::from([0.4, 0.5, 0.6]));
 }

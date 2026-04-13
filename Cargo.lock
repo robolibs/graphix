@@ -68,6 +68,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
+name = "datapod"
+version = "0.0.1"
+source = "git+https://codeberg.org/robolibs/datapod#b0da2bbaa372bdfe4a50f5150c7f082ae90e008a"
+
+[[package]]
 name = "divrem"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -126,16 +131,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "glam"
-version = "0.30.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19fc433e8437a212d1b6f1e68c7824af3aed907da60afa994e7f542d18d12aa9"
-
-[[package]]
 name = "graphix"
 version = "0.0.1"
 dependencies = [
- "glam",
+ "datapod",
  "kiddo",
  "rayon",
  "tokio",

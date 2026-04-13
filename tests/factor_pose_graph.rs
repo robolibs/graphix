@@ -1,6 +1,6 @@
 use std::f64::consts::PI;
 
-use glam::DVec2;
+use datapod::Point;
 
 use graphix::X;
 use graphix::factor::{PoseGraph2d, SE2d, cauchy_loss};
@@ -13,7 +13,12 @@ fn pose_graph_builder_collects_graph_and_initial_values() {
         .unwrap()
         .insert_pose_xytheta(X(1).into(), 2.0, 0.0, 0.0)
         .unwrap()
-        .add_prior(X(0).into(), SE2d::identity(), DVec2::splat(0.01), 0.01)
+        .add_prior(
+            X(0).into(),
+            SE2d::identity(),
+            Point::new(0.01, 0.01, 0.0),
+            0.01,
+        )
         .unwrap()
         .add_between_xytheta(
             X(0).into(),
@@ -21,7 +26,7 @@ fn pose_graph_builder_collects_graph_and_initial_values() {
             2.0,
             0.0,
             0.0,
-            DVec2::splat(0.1),
+            Point::new(0.1, 0.1, 0.0),
             0.05,
         )
         .unwrap()
@@ -31,7 +36,7 @@ fn pose_graph_builder_collects_graph_and_initial_values() {
             -2.1,
             0.0,
             0.0,
-            DVec2::splat(0.2),
+            Point::new(0.2, 0.2, 0.0),
             0.1,
             cauchy_loss(2.0),
         )
@@ -53,13 +58,20 @@ fn pose_graph_builder_supports_into_parts_for_optimizers() {
         .unwrap()
         .insert_pose_xytheta(X(1).into(), 2.0, 0.0, 0.0)
         .unwrap()
-        .add_prior_xytheta(X(0).into(), 0.0, 0.0, 0.0, DVec2::splat(0.01), 0.01)
+        .add_prior_xytheta(
+            X(0).into(),
+            0.0,
+            0.0,
+            0.0,
+            Point::new(0.01, 0.01, 0.0),
+            0.01,
+        )
         .unwrap()
         .add_between(
             X(0).into(),
             X(1).into(),
-            SE2d::from_translation_angle(DVec2::new(2.0, 0.0), PI / 2.0),
-            DVec2::splat(0.1),
+            SE2d::from_translation_angle(Point::new(2.0, 0.0, 0.0), PI / 2.0),
+            Point::new(0.1, 0.1, 0.0),
             0.05,
         )
         .unwrap();

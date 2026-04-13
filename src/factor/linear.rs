@@ -1,106 +1,18 @@
-use std::collections::BTreeMap;
-use std::ops::{Index, IndexMut};
+use datapod::{matrix, trees::OrderedMap};
 
 use crate::core::Key;
 
 use super::{Factor, FactorLike};
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Vector {
-    data: Vec<f64>,
-}
-
-impl Vector {
-    pub fn new(size: usize) -> Self {
-        Self {
-            data: vec![0.0; size],
-        }
-    }
-
-    pub fn from_vec(data: Vec<f64>) -> Self {
-        Self { data }
-    }
-
-    pub fn size(&self) -> usize {
-        self.data.len()
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &f64> {
-        self.data.iter()
-    }
-
-    pub fn scale(&mut self, factor: f64) {
-        for value in &mut self.data {
-            *value *= factor;
-        }
-    }
-}
-
-impl Index<usize> for Vector {
-    type Output = f64;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.data[index]
-    }
-}
-
-impl IndexMut<usize> for Vector {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.data[index]
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Matrix {
-    rows: usize,
-    cols: usize,
-    data: Vec<f64>,
-}
-
-impl Matrix {
-    pub fn new(rows: usize, cols: usize) -> Self {
-        Self {
-            rows,
-            cols,
-            data: vec![0.0; rows * cols],
-        }
-    }
-
-    pub fn rows(&self) -> usize {
-        self.rows
-    }
-
-    pub fn cols(&self) -> usize {
-        self.cols
-    }
-
-    pub fn scale(&mut self, factor: f64) {
-        for value in &mut self.data {
-            *value *= factor;
-        }
-    }
-}
-
-impl Index<(usize, usize)> for Matrix {
-    type Output = f64;
-
-    fn index(&self, index: (usize, usize)) -> &Self::Output {
-        &self.data[index.0 * self.cols + index.1]
-    }
-}
-
-impl IndexMut<(usize, usize)> for Matrix {
-    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
-        &mut self.data[index.0 * self.cols + index.1]
-    }
-}
+pub type Vector = matrix::DynamicVector<f64>;
+pub type Matrix = matrix::Dynamic<f64>;
 
 #[derive(Debug, Clone)]
 pub struct GaussianFactor {
     factor: Factor,
     jacobians: Vec<Matrix>,
     b: Vector,
-    key_index: BTreeMap<Key, usize>,
+    key_index: OrderedMap<Key, usize>,
 }
 
 impl GaussianFactor {
@@ -149,13 +61,17 @@ impl GaussianFactor {
     }
 
     pub fn scale(&mut self, factor: f64) {
-        self.b.scale(factor);
+        for value in self.b.iter_mut() {
+            *value *= factor;
+        }
         for jacobian in &mut self.jacobians {
-            jacobian.scale(factor);
+            for value in jacobian.iter_mut() {
+                *value *= factor;
+            }
         }
     }
 
-    pub fn error(&self, deltas: &BTreeMap<Key, Vector>) -> Result<f64, String> {
+    pub fn error(&self, deltas: &OrderedMap<Key, Vector>) -> Result<f64, String> {
         let mut residual = self.b.clone();
         for key in self.factor.keys() {
             let Some(jacobian) = self.jacobian(*key) else {

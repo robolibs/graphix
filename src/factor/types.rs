@@ -1,18 +1,20 @@
 use std::f64::consts::PI;
 use std::ops::Mul;
 
-use glam::{DVec2, DVec3};
+use datapod::{Point, mat};
 
-pub type Vec3d = DVec3;
+pub type Vec3d = mat::Vector3d;
+pub type DynVec = mat::DynamicVector<f64>;
+pub type DynMat = mat::Dynamic<f64>;
 
-pub fn se2_sigmas(translation: DVec2, rotation: f64) -> Vec3d {
-    DVec3::new(translation.x, translation.y, rotation)
+pub fn se2_sigmas(translation: Point, rotation: f64) -> Vec3d {
+    Vec3d::from([translation.x, translation.y, rotation])
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SE2d {
     theta: f64,
-    translation: DVec2,
+    translation: Point,
 }
 
 impl SE2d {
@@ -23,19 +25,22 @@ impl SE2d {
     pub fn new(theta: f64, x: f64, y: f64) -> Self {
         Self {
             theta,
-            translation: DVec2::new(x, y),
+            translation: Point::new(x, y, 0.0),
         }
     }
 
-    pub fn from_translation_angle(translation: DVec2, theta: f64) -> Self {
-        Self { theta, translation }
+    pub fn from_translation_angle(translation: Point, theta: f64) -> Self {
+        Self {
+            theta,
+            translation: Point::new(translation.x, translation.y, 0.0),
+        }
     }
 
     pub fn angle(&self) -> f64 {
         self.theta
     }
 
-    pub fn translation(&self) -> DVec2 {
+    pub fn translation(&self) -> Point {
         self.translation
     }
 
@@ -64,11 +69,11 @@ impl SE2d {
     }
 
     pub fn log(&self) -> Vec3d {
-        DVec3::new(
+        Vec3d::from([
             self.translation.x,
             self.translation.y,
             wrap_angle(self.theta),
-        )
+        ])
     }
 
     pub fn compose(&self, rhs: Self) -> Self {
@@ -79,16 +84,17 @@ impl SE2d {
         self.inverse() * other
     }
 
-    pub fn transform_point(&self, point: DVec2) -> DVec2 {
+    pub fn transform_point(&self, point: Point) -> Point {
         let c = self.theta.cos();
         let s = self.theta.sin();
-        DVec2::new(
+        Point::new(
             self.translation.x + c * point.x - s * point.y,
             self.translation.y + s * point.x + c * point.y,
+            point.z,
         )
     }
 
-    pub fn inverse_transform_point(&self, point: DVec2) -> DVec2 {
+    pub fn inverse_transform_point(&self, point: Point) -> Point {
         self.inverse().transform_point(point)
     }
 }

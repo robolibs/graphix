@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use glam::DVec2;
+use datapod::Point;
 
 use graphix::factor::{
     Factor, FactorLike, Graph, SE2d, Values, Vec3d, cauchy_loss, huber_loss, no_loss, se2_sigmas,
@@ -225,35 +225,35 @@ fn robust_losses_match_expected_formulas_and_ordering() {
 
 #[test]
 fn factor_public_geometry_types_remain_small_and_useful() {
-    let pose = SE2d::from_translation_angle(DVec2::new(1.0, 2.0), 0.25);
+    let pose = SE2d::from_translation_angle(Point::new(1.0, 2.0, 0.0), 0.25);
     assert!((pose.angle() - 0.25).abs() < 1e-12);
-    let delta = Vec3d::from_array([0.5, -0.25, 0.1]);
+    let delta = Vec3d::from([0.5, -0.25, 0.1]);
     let updated = pose.retract(delta);
     assert!((updated.x() - 1.5).abs() < 1e-12);
     assert!((updated.y() - 1.75).abs() < 1e-12);
-    assert_eq!(pose.translation(), DVec2::new(1.0, 2.0));
+    assert_eq!(pose.translation(), Point::new(1.0, 2.0, 0.0));
     assert_eq!(SE2d::identity(), SE2d::new(0.0, 0.0, 0.0));
     assert_eq!(
-        se2_sigmas(DVec2::new(0.1, 0.2), 0.3),
-        Vec3d::new(0.1, 0.2, 0.3)
+        se2_sigmas(Point::new(0.1, 0.2, 0.0), 0.3),
+        Vec3d::from([0.1, 0.2, 0.3])
     );
 }
 
 #[test]
 fn se2_helpers_cover_transform_and_relative_pose_workflows() {
-    let a = SE2d::from_translation_angle(DVec2::new(1.0, 0.0), 0.0);
-    let b = SE2d::from_translation_angle(DVec2::new(3.0, 2.0), 0.5);
+    let a = SE2d::from_translation_angle(Point::new(1.0, 0.0, 0.0), 0.0);
+    let b = SE2d::from_translation_angle(Point::new(3.0, 2.0, 0.0), 0.5);
 
     let relative = a.between(b);
     let recomposed = a.compose(relative);
 
     assert_eq!(recomposed, b);
     assert_eq!(
-        a.transform_point(DVec2::new(2.0, 1.0)),
-        DVec2::new(3.0, 1.0)
+        a.transform_point(Point::new(2.0, 1.0, 0.0)),
+        Point::new(3.0, 1.0, 0.0)
     );
     assert_eq!(
-        a.inverse_transform_point(DVec2::new(3.0, 1.0)),
-        DVec2::new(2.0, 1.0)
+        a.inverse_transform_point(Point::new(3.0, 1.0, 0.0)),
+        Point::new(2.0, 1.0, 0.0)
     );
 }
