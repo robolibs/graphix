@@ -1,11 +1,11 @@
 use std::f64::consts::PI;
 use std::ops::Mul;
 
-use datapod::{Point, mat};
+use datapod::Point;
 
-pub type Vec3d = mat::Vector3d;
-pub type DynVec = mat::DynamicVector<f64>;
-pub type DynMat = mat::Dynamic<f64>;
+pub type Vec3d = nalgebra::Vector3<f64>;
+pub type DynVec = nalgebra::DVector<f64>;
+pub type DynMat = nalgebra::DMatrix<f64>;
 
 pub fn se2_sigmas(translation: Point, rotation: f64) -> Vec3d {
     Vec3d::from([translation.x, translation.y, rotation])

@@ -14,7 +14,8 @@ name = "core_workloads"
 harness = false
 
 [dependencies]
-datapod = { git = "https://codeberg.org/robolibs/datapod" }
+datapod = { git = "https://codeberg.org/robolibs/datapod", rev = "4547e328826fb4fd788b7acac29c2f70efc62746" }
 kiddo = "4.2"
+nalgebra = "0.33"
 rayon = "1.10"
 tokio = { version = "1.48", features = ["fs", "macros", "rt-multi-thread"] }

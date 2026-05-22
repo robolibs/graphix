@@ -339,8 +339,8 @@ fn se2_linearization_matches_expected_shape_and_scaling() {
     assert!(b[2].abs() > 0.5);
 
     let jacobian = linear.jacobian(X(0).into()).unwrap();
-    assert_eq!(jacobian.rows(), 3);
-    assert_eq!(jacobian.cols(), 3);
+    assert_eq!(jacobian.nrows(), 3);
+    assert_eq!(jacobian.ncols(), 3);
     assert!((jacobian[(0, 0)] - 10.0).abs() < 1.0);
     assert!((jacobian[(1, 1)] - 10.0).abs() < 1.0);
     assert!((jacobian[(2, 2)] - 10.0).abs() < 1.0);
@@ -468,7 +468,7 @@ fn factor_graph_adapter_flattens_values_and_builds_jacobian() {
     assert_eq!(adapter.ordering().len(), 2);
 
     let params = adapter.values_to_params(&values).unwrap();
-    assert_eq!(params.size(), 2);
+    assert_eq!(params.len(), 2);
     assert!((params[0] - 7.0).abs() < 1e-9);
     assert!((params[1] - 10.0).abs() < 1e-9);
 
@@ -477,8 +477,8 @@ fn factor_graph_adapter_flattens_values_and_builds_jacobian() {
     assert!((residuals[1] - 0.5).abs() < 1e-6);
 
     let jacobian = adapter.jacobian(&params).unwrap();
-    assert_eq!(jacobian.rows(), 2);
-    assert_eq!(jacobian.cols(), 2);
+    assert_eq!(jacobian.nrows(), 2);
+    assert_eq!(jacobian.ncols(), 2);
     assert!((jacobian[(0, 0)] - 0.5).abs() < 1e-6);
     assert!((jacobian[(0, 1)] - 0.0).abs() < 1e-9);
     assert!((jacobian[(1, 0)] + 0.25).abs() < 1e-6);

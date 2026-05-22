@@ -31,14 +31,14 @@ where
 {
     let epsilon = 1e-7;
     let b = factor.error_vector(values);
-    let error_dim = b.size();
+    let error_dim = b.len();
     let mut keys = Vec::with_capacity(factor.keys().len());
     let mut jacobians = Vec::with_capacity(factor.keys().len());
 
     for key in factor.keys() {
         keys.push(*key);
         let var_dim = factor.dim(*key);
-        let mut jacobian = Matrix::new(error_dim, var_dim);
+        let mut jacobian = Matrix::zeros(error_dim, var_dim);
 
         for col in 0..var_dim {
             let perturbed = perturb_value(values, *key, col, epsilon)?;
@@ -545,7 +545,7 @@ impl GradientDescentOptimizer {
         let mut converged = false;
 
         for iteration in 0..=self.params.max_iterations {
-            let gradients: Vec<f64> = (0..params.size())
+            let gradients: Vec<f64> = (0..params.len())
                 .map(|index| {
                     finite_difference_gradient_params(&adapter, &params, index, self.params.h)
                 })
@@ -980,7 +980,7 @@ where
         let total_residual_dim = graph.iter().try_fold(0usize, |acc, factor| {
             factor
                 .linearize(values)
-                .map(|gaussian| acc + gaussian.b().size())
+                .map(|gaussian| acc + gaussian.b().len())
         })?;
 
         Ok(Self {
@@ -1005,7 +1005,7 @@ where
     }
 
     pub fn values_to_params(&self, values: &Values) -> Result<Vector, String> {
-        let mut params = Vector::new(self.total_param_dim);
+        let mut params = Vector::zeros(self.total_param_dim);
         for info in &self.ordering {
             match info.dim {
                 1 => {
@@ -1033,7 +1033,7 @@ where
     }
 
     pub fn params_to_values(&self, params: &Vector) -> Result<Values, String> {
-        if params.size() != self.total_param_dim {
+        if params.len() != self.total_param_dim {
             return Err("parameter vector dimension mismatch".to_string());
         }
 
@@ -1072,15 +1072,15 @@ where
 
     pub fn residuals(&self, params: &Vector) -> Result<Vector, String> {
         let values = self.params_to_values(params)?;
-        let mut residuals = Vector::new(self.total_residual_dim);
+        let mut residuals = Vector::zeros(self.total_residual_dim);
         let mut offset = 0;
 
         for factor in self.graph.iter() {
             let gaussian = factor.linearize(&values)?;
-            for i in 0..gaussian.b().size() {
+            for i in 0..gaussian.b().len() {
                 residuals[offset + i] = gaussian.b()[i];
             }
-            offset += gaussian.b().size();
+            offset += gaussian.b().len();
         }
 
         Ok(residuals)
@@ -1088,7 +1088,7 @@ where
 
     pub fn jacobian(&self, params: &Vector) -> Result<Matrix, String> {
         let values = self.params_to_values(params)?;
-        let mut jacobian = Matrix::new(self.total_residual_dim, self.total_param_dim);
+        let mut jacobian = Matrix::zeros(self.total_residual_dim, self.total_param_dim);
         let mut residual_offset = 0;
 
         for factor in self.graph.iter() {
@@ -1100,13 +1100,13 @@ where
                     .find(|info| info.key == *key)
                     .ok_or_else(|| "key not found in ordering".to_string())?;
                 let block = &gaussian.jacobians()[ki];
-                for row in 0..block.rows() {
-                    for col in 0..block.cols() {
+                for row in 0..block.nrows() {
+                    for col in 0..block.ncols() {
                         jacobian[(residual_offset + row, info.offset + col)] = block[(row, col)];
                     }
                 }
             }
-            residual_offset += gaussian.b().size();
+            residual_offset += gaussian.b().len();
         }
 
         Ok(jacobian)
@@ -1267,7 +1267,7 @@ where
 
             for col_a in 0..info_a.dim {
                 let global_a = info_a.offset + col_a;
-                for row in 0..residual.size() {
+                for row in 0..residual.len() {
                     gradient[global_a] += jacobian_a[(row, col_a)] * residual[row];
                 }
             }
@@ -1284,7 +1284,7 @@ where
                     for col_b in 0..info_b.dim {
                         let global_b = info_b.offset + col_b;
                         let mut sum = 0.0;
-                        for row in 0..residual.size() {
+                        for row in 0..residual.len() {
                             sum += jacobian_a[(row, col_a)] * jacobian_b[(row, col_b)];
                         }
                         hessian[global_a][global_b] += sum;

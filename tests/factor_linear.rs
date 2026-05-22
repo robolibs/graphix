@@ -8,9 +8,9 @@ use graphix::factor::{
 
 #[test]
 fn gaussian_factor_constructs_and_exposes_components() {
-    let mut j = Matrix::new(1, 1);
+    let mut j = Matrix::zeros(1, 1);
     j[(0, 0)] = 2.0;
-    let mut b = Vector::new(1);
+    let mut b = Vector::zeros(1);
     b[0] = 3.0;
 
     let gf = GaussianFactor::new(vec![1], vec![j.clone()], b.clone()).unwrap();
@@ -23,23 +23,23 @@ fn gaussian_factor_constructs_and_exposes_components() {
 
 #[test]
 fn gaussian_factor_validates_dimensions() {
-    let j1 = Matrix::new(2, 3);
-    let j2 = Matrix::new(3, 3);
-    let b = Vector::new(2);
+    let j1 = Matrix::zeros(2, 3);
+    let j2 = Matrix::zeros(3, 3);
+    let b = Vector::zeros(2);
 
     assert!(GaussianFactor::new(vec![1, 2], vec![j1, j2], b).is_err());
 }
 
 #[test]
 fn gaussian_factor_computes_error() {
-    let mut j = Matrix::new(1, 1);
+    let mut j = Matrix::zeros(1, 1);
     j[(0, 0)] = 2.0;
-    let mut b = Vector::new(1);
+    let mut b = Vector::zeros(1);
     b[0] = 3.0;
     let gf = GaussianFactor::new(vec![1], vec![j], b).unwrap();
 
     let mut deltas = BTreeMap::new();
-    let mut delta = Vector::new(1);
+    let mut delta = Vector::zeros(1);
     delta[0] = 1.0;
     deltas.insert(1, delta);
 
@@ -48,18 +48,18 @@ fn gaussian_factor_computes_error() {
 
 #[test]
 fn gaussian_factor_handles_multiple_variables() {
-    let mut j1 = Matrix::new(1, 1);
+    let mut j1 = Matrix::zeros(1, 1);
     j1[(0, 0)] = 2.0;
-    let mut j2 = Matrix::new(1, 1);
+    let mut j2 = Matrix::zeros(1, 1);
     j2[(0, 0)] = 3.0;
-    let mut b = Vector::new(1);
+    let mut b = Vector::zeros(1);
     b[0] = 1.0;
     let gf = GaussianFactor::new(vec![1, 2], vec![j1, j2], b).unwrap();
 
     let mut deltas = BTreeMap::new();
-    let mut d1 = Vector::new(1);
+    let mut d1 = Vector::zeros(1);
     d1[0] = 1.0;
-    let mut d2 = Vector::new(1);
+    let mut d2 = Vector::zeros(1);
     d2[0] = 1.0;
     deltas.insert(1, d1);
     deltas.insert(2, d2);
@@ -69,14 +69,14 @@ fn gaussian_factor_handles_multiple_variables() {
 
 #[test]
 fn gaussian_factor_scaling_preserves_quadratic_error_equivalence() {
-    let mut j = Matrix::new(1, 1);
+    let mut j = Matrix::zeros(1, 1);
     j[(0, 0)] = 4.0;
-    let mut b = Vector::new(1);
+    let mut b = Vector::zeros(1);
     b[0] = 6.0;
     let mut gf = GaussianFactor::new(vec![1], vec![j], b).unwrap();
 
     let mut deltas = BTreeMap::new();
-    let mut delta = Vector::new(1);
+    let mut delta = Vector::zeros(1);
     delta[0] = 0.5;
     deltas.insert(1, delta);
 
@@ -102,8 +102,8 @@ fn se2_between_linearization_handles_exact_measurement_and_error_cases() {
     exact.insert(X(1).into(), SE2d::new(0.0, 1.0, 0.0)).unwrap();
     let exact_linear = factor.linearize(&exact).unwrap();
     assert!(exact_linear.b().iter().all(|value| value.abs() < 0.1));
-    assert_eq!(exact_linear.jacobian(X(0).into()).unwrap().rows(), 3);
-    assert_eq!(exact_linear.jacobian(X(1).into()).unwrap().cols(), 3);
+    assert_eq!(exact_linear.jacobian(X(0).into()).unwrap().nrows(), 3);
+    assert_eq!(exact_linear.jacobian(X(1).into()).unwrap().ncols(), 3);
 
     let mut offset = Values::new();
     offset
