@@ -2,20 +2,21 @@ use std::env;
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 
-use glam::DVec2;
+use datapod::Point;
 
 use graphix::X;
 use graphix::factor::{GaussNewtonOptimizer, PoseGraph2d, SE2d};
 use graphix::vertex::algorithms::betweenness_centrality_parallel;
 use graphix::vertex::spatial::knn_graph_2d;
 
-fn sample_points(count: usize) -> Vec<DVec2> {
+fn sample_points(count: usize) -> Vec<Point> {
     (0..count)
         .map(|index| {
             let t = index as f64 * 0.15;
-            DVec2::new(
+            Point::new(
                 t.cos() * (1.0 + 0.02 * index as f64),
                 t.sin() * (1.0 + 0.02 * index as f64),
+                0.0,
             )
         })
         .collect()
@@ -23,7 +24,7 @@ fn sample_points(count: usize) -> Vec<DVec2> {
 
 fn build_pose_chain_problem(count: usize) -> PoseGraph2d {
     let mut problem = PoseGraph2d::new();
-    let sigma_xy = DVec2::splat(0.05);
+    let sigma_xy = Point::new(0.05, 0.05, 0.0);
     for index in 0..count {
         let x = index as f64 * 0.5;
         let y = (index as f64 * 0.03).sin() * 0.2;
@@ -33,7 +34,7 @@ fn build_pose_chain_problem(count: usize) -> PoseGraph2d {
             0.0
         };
         let noisy_pose = SE2d::from_translation_angle(
-            DVec2::new(x + 0.02 * index as f64, y - 0.01 * index as f64),
+            Point::new(x + 0.02 * index as f64, y - 0.01 * index as f64, 0.0),
             theta + 0.005 * index as f64,
         );
         problem
@@ -42,14 +43,14 @@ fn build_pose_chain_problem(count: usize) -> PoseGraph2d {
     }
 
     problem
-        .add_prior(X(0).into(), SE2d::identity(), DVec2::splat(0.01), 0.01)
+        .add_prior(X(0).into(), SE2d::identity(), Point::new(0.01, 0.01, 0.0), 0.01)
         .unwrap();
 
     for index in 0..(count - 1) {
         let from = index as f64;
         let to = (index + 1) as f64;
-        let p0 = DVec2::new(from * 0.5, (from * 0.03).sin() * 0.2);
-        let p1 = DVec2::new(to * 0.5, (to * 0.03).sin() * 0.2);
+        let p0 = Point::new(from * 0.5, (from * 0.03).sin() * 0.2, 0.0);
+        let p1 = Point::new(to * 0.5, (to * 0.03).sin() * 0.2, 0.0);
         let delta = p1 - p0;
         let theta = delta.y.atan2(delta.x);
         problem
