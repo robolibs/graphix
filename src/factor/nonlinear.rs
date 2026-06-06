@@ -1,3 +1,5 @@
+#![allow(clippy::collapsible_if, clippy::needless_range_loop)]
+
 use std::sync::Arc;
 
 use datapod::Point;

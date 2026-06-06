@@ -167,7 +167,7 @@ fn edge_property_accessors_work() {
         })
     );
     g.edge_property_mut(e).unwrap().stop = true;
-    assert_eq!(g.edge_property(e).unwrap().stop, true);
+    assert!(g.edge_property(e).unwrap().stop);
 }
 
 #[test]

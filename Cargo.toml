@@ -1,6 +1,6 @@
 [package]
 name = "graphix"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Rust graph library combining vertex graphs and factor graphs"
 license = "MIT"
@@ -8,15 +8,24 @@ publish = false
 
 [lib]
 path = "src/lib.rs"
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = []
+python = ["dep:pyo3"]
 
 [[bench]]
 name = "core_workloads"
 harness = false
 
 [dependencies]
-datapod = { git = "https://codeberg.org/robolibs/datapod", tag = "0.2.0" }
+datapod = { git = "https://codeberg.org/robolibs/datapod", tag = "0.4.0" }
 glam = "0.33.0"
 kiddo = "4.2"
 nalgebra = "0.33"
 rayon = "1.10"
 tokio = { version = "1.48", features = ["fs", "macros", "rt-multi-thread"] }
+pyo3 = { version = "0.23", optional = true, features = [
+    "abi3-py39",
+    "extension-module",
+] }
