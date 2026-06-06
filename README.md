@@ -46,7 +46,8 @@ The examples directory is intentionally trimmed to focused workflows rather than
 - `make run`
   Runs `cargo run --example main`
 - `make test`
-  Runs the full test suite
+  Runs the library, integration-test, and example test suites without executing
+  the custom benchmark binary
 - `make bench`
   Runs the custom quick benchmark target
 
@@ -74,4 +75,4 @@ Current quick benchmark numbers from this repository on April 9, 2026:
 
 These numbers are only a local reference point. They depend on machine, compiler version, and system load.
 
-One practical detail: `core_workloads` is a custom `harness = false` bench target, so `cargo test --all-targets` also executes it. That is valid, but it makes the all-targets test path slower than `cargo test --tests --examples`.
+One practical detail: `core_workloads` is a custom `harness = false` bench target, so `cargo test --all-targets` also executes it. `make test` intentionally avoids that by running `cargo test --lib --tests --examples`; use `make bench` when you want the benchmark path.

@@ -3,6 +3,8 @@
 //! Keep the root focused on graph structure, factors, losses, and optimizers.
 //! Low-level math aliases and helper functions live under `graphix::factor::types`.
 
+#![allow(clippy::module_inception)]
+
 mod factor;
 mod graph;
 mod linear;

@@ -43,7 +43,12 @@ fn build_pose_chain_problem(count: usize) -> PoseGraph2d {
     }
 
     problem
-        .add_prior(X(0).into(), SE2d::identity(), Point::new(0.01, 0.01, 0.0), 0.01)
+        .add_prior(
+            X(0).into(),
+            SE2d::identity(),
+            Point::new(0.01, 0.01, 0.0),
+            0.01,
+        )
         .unwrap();
 
     for index in 0..(count - 1) {

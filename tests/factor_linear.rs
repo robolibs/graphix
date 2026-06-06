@@ -135,7 +135,7 @@ fn se2_linearization_is_numerically_stable_for_small_sigmas_and_large_values() {
 
     let large_value = SE2PriorFactor::new(
         X(0).into(),
-        SE2d::new(3.14, 1000.0, 2000.0),
+        SE2d::new(std::f64::consts::PI, 1000.0, 2000.0),
         Vec3d::from([10.0, 10.0, 0.1]),
     )
     .unwrap();

@@ -145,21 +145,14 @@ fn dot_operations_report_invalid_paths() {
         .join("graphix_rs_missing_parent")
         .join("nested")
         .join("graph.dot");
-    let _ = std::fs::remove_dir_all(
-        missing_parent
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .to_path_buf(),
-    );
+    let _ = std::fs::remove_dir_all(missing_parent.parent().unwrap().parent().unwrap());
 
     assert!(graph.save_dot_default(&missing_parent).is_err());
 
     let missing_file = std::env::temp_dir()
         .join("graphix_rs_missing_file")
         .join("missing.dot");
-    let _ = std::fs::remove_dir_all(missing_file.parent().unwrap().to_path_buf());
+    let _ = std::fs::remove_dir_all(missing_file.parent().unwrap());
     assert!(Graph::<(), ()>::load_dot_default(&missing_file).is_err());
 }
 
