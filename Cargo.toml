@@ -1,6 +1,6 @@
 [package]
 name = "graphix"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "Rust graph library combining vertex graphs and factor graphs"
 license = "MIT"
@@ -19,7 +19,7 @@ name = "core_workloads"
 harness = false
 
 [dependencies]
-datapod = { git = "https://codeberg.org/robolibs/datapod", tag = "0.4.0" }
+datapod = { git = "https://codeberg.org/robolibs/datapod", tag = "0.4.1" }
 glam = "0.33.0"
 kiddo = "4.2"
 nalgebra = "0.33"
