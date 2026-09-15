@@ -29,3 +29,103 @@ pyo3 = { version = "0.23", optional = true, features = [
     "abi3-py39",
     "extension-module",
 ] }
+
+[[example]]
+name = "astar"
+path = "examples/rust/astar.rs"
+
+[[example]]
+name = "bellman_ford"
+path = "examples/rust/bellman_ford.rs"
+
+[[example]]
+name = "bfs"
+path = "examples/rust/bfs.rs"
+
+[[example]]
+name = "centrality"
+path = "examples/rust/centrality.rs"
+
+[[example]]
+name = "compare_optimizers"
+path = "examples/rust/compare_optimizers.rs"
+
+[[example]]
+name = "cycle_detection"
+path = "examples/rust/cycle_detection.rs"
+
+[[example]]
+name = "dijkstra"
+path = "examples/rust/dijkstra.rs"
+
+[[example]]
+name = "factor_optimization"
+path = "examples/rust/factor_optimization.rs"
+
+[[example]]
+name = "farmtrax_compatible"
+path = "examples/rust/farmtrax_compatible.rs"
+
+[[example]]
+name = "full_features"
+path = "examples/rust/full_features.rs"
+
+[[example]]
+name = "graph_properties"
+path = "examples/rust/graph_properties.rs"
+
+[[example]]
+name = "graph_transformations"
+path = "examples/rust/graph_transformations.rs"
+
+[[example]]
+name = "graph_views"
+path = "examples/rust/graph_views.rs"
+
+[[example]]
+name = "main"
+path = "examples/rust/main.rs"
+
+[[example]]
+name = "property_map"
+path = "examples/rust/property_map.rs"
+
+[[example]]
+name = "robust_slam"
+path = "examples/rust/robust_slam.rs"
+
+[[example]]
+name = "se2_slam_2d"
+path = "examples/rust/se2_slam_2d.rs"
+
+[[example]]
+name = "serialization"
+path = "examples/rust/serialization.rs"
+
+[[example]]
+name = "simple_graph"
+path = "examples/rust/simple_graph.rs"
+
+[[example]]
+name = "spatial_index"
+path = "examples/rust/spatial_index.rs"
+
+[[example]]
+name = "spatial_pathfinding"
+path = "examples/rust/spatial_pathfinding.rs"
+
+[[example]]
+name = "spatial_pose_graph"
+path = "examples/rust/spatial_pose_graph.rs"
+
+[[example]]
+name = "strongly_connected_components"
+path = "examples/rust/strongly_connected_components.rs"
+
+[[example]]
+name = "topological_sort"
+path = "examples/rust/topological_sort.rs"
+
+[[example]]
+name = "views_transformations"
+path = "examples/rust/views_transformations.rs"
